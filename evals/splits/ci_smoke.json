@@ -1,0 +1,29 @@
+{
+  "name": "ci_smoke",
+  "source": "patronus-ai/financebench@cc39aeb4afdf33909ee1412188bf89035950c2eb",
+  "seed": 13,
+  "stratified_by": "question_type",
+  "size": 20,
+  "ids": [
+    "financebench_id_07507",
+    "financebench_id_06655",
+    "financebench_id_08135",
+    "financebench_id_01148",
+    "financebench_id_01198",
+    "financebench_id_04660",
+    "financebench_id_00585",
+    "financebench_id_04103",
+    "financebench_id_10136",
+    "financebench_id_00956",
+    "financebench_id_01484",
+    "financebench_id_01490",
+    "financebench_id_03282",
+    "financebench_id_01009",
+    "financebench_id_00882",
+    "financebench_id_02416",
+    "financebench_id_00746",
+    "financebench_id_00521",
+    "financebench_id_00605",
+    "financebench_id_02024"
+  ]
+}

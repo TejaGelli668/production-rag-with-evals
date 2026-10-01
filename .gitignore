@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data (FinanceBench is CC-BY-NC 4.0: downloaded by script, never committed)
+/data/
+
+# Local artifacts
+/storage/
+.env
+.ipynb_checkpoints/
+.DS_Store

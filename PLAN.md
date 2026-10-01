@@ -1,0 +1,297 @@
+# Production RAG With Evals: Project Plan
+
+> A question-answering system over SEC filings (10-K, 10-Q, 8-K), built and tuned through evaluation.
+> Every design choice is backed by a measured experiment on the FinanceBench benchmark.
+
+---
+
+## 1. Goal and pitch
+
+**Pitch:** *"I built a RAG system over real financial filings, measured it against a human-labeled benchmark, ran controlled experiments, and can show with numbers why each component is there."*
+
+What sets it apart from a typical RAG demo:
+
+| Typical portfolio RAG | This project |
+|---|---|
+| 3 toy text files | ~360 real SEC filings, 100+ pages each, full of tables |
+| "Eval" = latency logging | Human-labeled ground truth: answers **and** evidence pages |
+| One pipeline, untested | Experiment matrix with before/after metrics for each component |
+| Several frameworks and vector DBs bolted on | One clean pipeline behind small interfaces |
+| No regression safety | CI eval gate that fails a PR if quality drops |
+
+---
+
+## 2. Dataset: FinanceBench
+
+**Source:** [patronus-ai/financebench](https://github.com/patronus-ai/financebench) (GitHub) / `PatronusAI/financebench` (Hugging Face)
+**License:** CC-BY-NC 4.0, fine for a non-commercial portfolio. **Do not commit the PDFs to the repo.** Download them with a script.
+
+### What's in it (checked on 2026-10-01)
+
+| Item | Count |
+|---|---|
+| Labeled questions (open-source sample) | **150** |
+| Companies covered by questions | 32 |
+| Distinct documents referenced by questions | 84 |
+| Documents in the metadata file | 361 rows / 360 unique (269 10-K, 30 8-K, 29 earnings, 27 10-Q, 5 annual reports) |
+| PDFs in the GitHub repo | 368 |
+
+**Question fields:** `financebench_id`, `company`, `doc_name`, `question_type`, `question_reasoning`, `question`, `answer`, `justification`, `evidence[]`
+**Evidence fields:** `evidence_text`, `doc_name`, `evidence_page_num`, `evidence_text_full_page`
+**Document fields:** `doc_name`, `company`, `gics_sector`, `doc_type`, `doc_period`, `doc_link`
+
+**Question mix:** 50 `metrics-generated`, 50 `domain-relevant`, 50 `novel-generated`. Reasoning types are mostly *numerical reasoning* and *information extraction*, plus some *logical reasoning*.
+
+Example: *"What is the FY2018 capital expenditure amount (in USD millions) for 3M?"* → `$1577.00`
+
+### Corpus modes
+
+| Mode | Documents | Purpose |
+|---|---|---|
+| `focused` | 84 (only the ones the questions reference) | Fast, cheap iteration during development |
+| `full` | All 360 with metadata | The realistic setting: retrieval has to find the right filing among hundreds of similar ones |
+
+Headline results are reported on **`full`**. That's the hard, honest setting, and the FinanceBench paper found that standard RAG baselines fail on most questions in it.
+
+### Eval splits
+
+| Split | Size | Use |
+|---|---|---|
+| `dev` | 50 (stratified by `question_type`) | Tuning and experiments; looked at often |
+| `test` | 100 (stratified) | Held out; run only at milestones to report final numbers |
+| `custom` | ~40 written by hand | Unanswerable questions (company not in corpus, future fiscal year, metric not disclosed), ambiguous questions, multi-document comparisons |
+| `ci_smoke` | 20 (subset of `dev`) | Run on every PR by the CI gate |
+
+Splits are fixed with a seed and committed as ID lists in `evals/splits/`.
+
+---
+
+## 3. Architecture
+
+```
+                ┌───────────────────────── Ingestion (offline) ─────────────────────────┐
+ SEC PDFs ──►   │ parse (page-aware, tables) ─► chunk ─► enrich metadata ─► embed       │ ──► Qdrant
+                │  (company, doc_type, fiscal_year, page_num, section)  dense + sparse  │    (hybrid)
+                └───────────────────────────────────────────────────────────────────────┘
+
+                ┌──────────────────────────── Query (online) ───────────────────────────┐
+ Question ──►   │ query analysis ─► hybrid retrieve ─► rerank ─► generate with citations│ ──► Answer
+                │ (company/year       (dense + BM25,     (cross-     (cited pages, or     │    + sources
+                │  filter extraction)  RRF fusion)        encoder)    "insufficient info")│
+                └───────────────────────────────────────────────────────────────────────┘
+                         │ every step traced (latency, tokens, cost, retrieved chunks)
+                         ▼
+                   Arize Phoenix                     Eval harness ◄── golden splits
+```
+
+### Key design decisions
+
+- **Page-aware throughout.** Every chunk keeps `doc_name` and `page_num`, because FinanceBench labels evidence by page. That makes it possible to measure retrieval exactly.
+- **Metadata filtering.** Questions almost always name a company and fiscal year. Pulling those out and filtering on them is probably the single biggest retrieval win. We'll measure it.
+- **Tables.** Financial statements are tables, and how they're parsed decides whether numerical questions succeed. Text extraction and table-aware extraction get compared.
+- **Refusals by design.** When retrieval confidence is low, the system says "insufficient information" instead of guessing. The `custom` unanswerable questions measure this.
+- **Plain Python core.** No LangChain or LlamaIndex in the core pipeline, so every step is easy to read and explain in an interview. Libraries are used for the components themselves: parsers, Qdrant client, embedding models.
+
+---
+
+## 4. Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Language / tooling | Python 3.12, `uv`, `ruff`, `pytest` | Fast and modern; standard choices |
+| PDF parsing | `pymupdf` (baseline) vs `docling` (table-aware) | Compared in an experiment |
+| Embeddings | `BAAI/bge-small-en-v1.5` locally (baseline); try `bge-m3` or an API model | Free, no API key needed for retrieval |
+| Sparse / BM25 | Qdrant sparse vectors (BM25 / SPLADE) | Hybrid search inside one store |
+| Vector store | **Qdrant** (Docker) | Native hybrid search and payload filtering |
+| Reranker | `BAAI/bge-reranker-v2-m3` (cross-encoder) | Strong open-source reranker |
+| Generator LLM | Claude Sonnet (`claude-sonnet-5-5`), behind a provider interface | Strong numerical reasoning; can be swapped |
+| Judge LLM | Claude Haiku (`claude-haiku-4-5-20251001`) | Cheap; checked against human labels |
+| Local fallback | Ollama | Runs with no API key |
+| API | FastAPI with streaming (SSE) | Production-style service |
+| UI | Streamlit | Quick to build; shows answer, cited pages and PDF snippet |
+| Tracing | Arize Phoenix (OpenTelemetry) | A single container; per-request traces |
+| Packaging | Docker Compose (api, qdrant, ui, phoenix) | Starts with one command |
+| CI | GitHub Actions | Lint, unit tests and eval gate |
+
+---
+
+## 5. Evaluation design
+
+### Metrics
+
+**Retrieval** (from `evidence[].doc_name` and `evidence_page_num`)
+- **Doc Hit@k**: is the correct filing among the top-k results?
+- **Page Hit@k**: is a gold evidence page among the top-k results?
+- **MRR**: reciprocal rank of the first correct page
+
+**Generation**
+- **Answer correctness**: LLM judge compares the answer to the gold answer, with **numeric tolerance** (units and rounding, e.g. `$1,577M` = `$1577.00`). Grades: correct / incorrect / refused.
+- **Faithfulness**: is every claim supported by the retrieved context?
+- **Citation accuracy**: do the cited pages contain the evidence?
+- **Refusal quality**: correct refusal on unanswerable questions vs. false refusal on answerable ones
+
+**Operational:** latency p50/p95, tokens and $ per query, ingestion time
+
+### Bounds (to tell retrieval failures from generation failures)
+- **Closed-book** (no retrieval): lower bound; shows what the LLM already "knows"
+- **Oracle context** (gold evidence pages given directly): upper bound for generation
+- The **gap** between the system and the oracle is how much retrieval is costing us.
+
+### Judge calibration
+Label about 60 answers by hand, then report agreement between the judge and the human labels (accuracy and Cohen's κ). If the judge disagrees too often, fix the judge prompt before trusting any numbers.
+
+### Error analysis
+Tag each failure as one of: wrong doc / right doc but wrong page / right page but table parse broke / arithmetic error / hallucination / false refusal. Report the breakdown in the README.
+
+---
+
+## 6. Experiment matrix
+
+Each step changes **one thing**, is run on `dev`, and is logged to `evals/results/` with the config and git SHA.
+
+| # | Experiment | Hypothesis |
+|---|---|---|
+| E0 | Closed-book and oracle-context bounds | Sets the floor and ceiling |
+| E1 | **Baseline:** pymupdf, fixed 512-token chunks, dense, k=5 | Reference point |
+| E2 | Chunking: fixed vs recursive vs page-level vs section-aware | Page and section chunks fit the evidence labels better |
+| E3 | Table-aware parsing (docling) | Big improvement on numerical-reasoning questions |
+| E4 | Hybrid (dense + BM25, RRF) | Helps with exact terms (tickers, line items, "FY2019") |
+| E5 | Metadata filtering (company / fiscal year / doc_type) | Large Doc Hit@k improvement in `full` mode |
+| E6 | Cross-encoder reranker (retrieve 50 → rerank to 5) | Better Page Hit@5 and answer precision |
+| E7 | Query rewriting / decomposition for multi-part questions | Helps comparison and ratio questions |
+| E8 | Prompting: structured "find numbers → compute → answer" | Fewer arithmetic errors |
+| E9 | Embedding model swap (bge-small → bge-m3 / API) | Quality vs cost trade-off |
+
+The best configuration gets run once on `test` for the headline numbers.
+
+---
+
+## 7. Repository structure
+
+```
+production-rag-with-evals/
+├── PLAN.md
+├── README.md                    # results table, charts, architecture, demo link
+├── pyproject.toml / uv.lock
+├── docker-compose.yml
+├── Makefile                     # make data | ingest | serve | eval | eval-ci
+├── .env.example
+├── configs/                     # YAML pipeline configs, one per experiment
+│   ├── baseline.yaml
+│   └── best.yaml
+├── scripts/
+│   └── download_financebench.py # fetch PDFs + jsonl into data/ (gitignored)
+├── src/rag/
+│   ├── config.py                # pydantic settings + YAML config loading
+│   ├── ingest/                  # parsers/, chunkers/, metadata.py, pipeline.py
+│   ├── retrieve/                # dense.py, sparse.py, hybrid.py, filters.py, rerank.py
+│   ├── generate/                # llm.py (provider interface), prompts/, citations.py
+│   ├── pipeline.py              # query → answer orchestration
+│   ├── tracing.py               # OpenTelemetry / Phoenix setup
+│   └── api/                     # FastAPI app, schemas, streaming
+├── ui/
+│   └── app.py                   # Streamlit
+├── evals/
+│   ├── splits/                  # dev.json, test.json, ci_smoke.json (IDs only)
+│   ├── custom/                  # hand-written unanswerable / adversarial questions
+│   ├── metrics/                 # retrieval.py, correctness.py, faithfulness.py
+│   ├── judge/                   # judge prompts + calibration labels
+│   ├── run_eval.py              # run a config on a split → results JSON
+│   ├── compare.py               # diff two runs, regression check
+│   └── results/                 # committed run summaries (not raw outputs)
+├── tests/                       # unit tests (chunkers, metric math, numeric matching)
+└── .github/workflows/
+    ├── ci.yml                   # lint + unit tests
+    └── eval-gate.yml            # ci_smoke eval; fail if below thresholds
+```
+
+---
+
+## 8. Phases and milestones
+
+### Phase 0: Setup and data (~½ day) ✅
+- [x] `git init`, `uv` project (Python 3.12), ruff, pytest, pre-commit, `.gitignore` (including `data/`)
+- [x] `scripts/download_financebench.py`: questions jsonl, document info jsonl, PDFs, pinned to upstream commit `cc39aeb`, with each PDF checked against its git blob SHA; re-runs skip intact files
+- [x] Data exploration as a reproducible script (`scripts/explore_data.py` → [`docs/data_exploration.md`](docs/data_exploration.md)) instead of a notebook. **`evidence_page_num` is 0-based** (189/189 evidence items match the PyMuPDF page index)
+- [x] Create the `dev` / `test` / `ci_smoke` splits in `evals/splits/` (seed 13, stratified by `question_type`)
+- **Done when:** `make data` downloads everything reproducibly; splits are committed
+
+Notes from Phase 0:
+- `full` corpus = **360** documents: the metadata file has 361 rows, and one (`FOOTLOCKER_2023_annualreport`) appears twice; the first row is kept. 8 upstream PDFs have no metadata and are left out.
+- No OCR needed; table structure is the parsing challenge. Each company has a median of 9 filings, which are the hard distractors. 23% of questions need more than one page. See the implications section of the data report.
+
+### Phase 1: Baseline pipeline (~1–2 days)
+- [ ] Page-aware PDF parsing (pymupdf), fixed-size chunker, metadata extraction from `doc_name` and document info
+- [ ] Qdrant via Docker; embed and index in `focused` mode
+- [ ] Dense retrieval, plus generation with page citations through the LLM provider interface
+- [ ] CLI: `rag ask "..."`
+- **Done when:** the CLI answers a FinanceBench question with cited pages
+
+### Phase 2: Eval harness (~2 days)
+- [ ] Retrieval metrics (Doc Hit@k, Page Hit@k, MRR)
+- [ ] Correctness judge with numeric tolerance, faithfulness judge, citation check
+- [ ] `run_eval.py` → results JSON, and `compare.py` → diff table
+- [ ] Hand-label ~60 answers and calibrate the judge
+- [ ] Write the `custom` unanswerable set
+- [ ] Run E0 (bounds) and E1 (baseline)
+- **Done when:** one command produces a full metrics report for any config
+
+### Phase 3: Experiments (~2–3 days)
+- [ ] Run E2–E9 on `dev` in `full` mode, one change at a time
+- [ ] Error analysis on the best config
+- [ ] Final run on `test`; produce charts for the README
+- **Done when:** the results table shows a measured gain for each component that was kept
+
+### Phase 4: Service, UI and observability (~1–2 days)
+- [ ] FastAPI: `/ask` (streaming), `/health`, `/feedback`
+- [ ] Streamlit: question box, answer, citation cards with page snippets, 👍/👎
+- [ ] Phoenix tracing on every step; cost and latency per request
+- [ ] `docker compose up` brings up the whole stack
+- **Done when:** a fresh clone, `make data && make ingest && docker compose up`, works end to end
+
+### Phase 5: CI, deployment and write-up (~1 day)
+- [ ] `ci.yml`: lint and unit tests
+- [ ] `eval-gate.yml`: `ci_smoke` eval with thresholds; posts a metrics summary on the PR
+- [ ] Live demo deployment (see open decisions)
+- [ ] README: pitch, architecture diagram, results table, experiment story, error analysis, limitations, how to run
+- **Done when:** the repo is public, the demo link works and the README tells the story with numbers
+
+**Total:** about 8–11 focused days.
+
+---
+
+## 9. Budget estimate (rough)
+
+| Item | Estimate |
+|---|---|
+| Embeddings and reranking | $0 (local models) |
+| One full eval run on `dev` (50 Qs × generation + 2–3 judge calls) | ~$0.50–$2 |
+| Experiment phase (~30–50 runs) | ~$15–40 |
+| CI smoke runs (20 Qs per PR) | cents per run |
+
+Ways to keep this down: run in `focused` mode during development, cache LLM responses by (prompt, model), and use the cheap judge model.
+
+---
+
+## 10. Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Table parsing on scanned or complex PDFs | Compare parsers in E3; record known failure cases |
+| LLM judge disagrees with humans | Calibration set; numeric-match rules before the LLM judge |
+| Overfitting to `dev` | Held-out `test` set run only at milestones |
+| Large corpus makes ingestion slow | Cache parsed pages; build `focused` first |
+| Dataset license (non-commercial) | Never redistribute the PDFs; download them with a script; note it in the README |
+| Free-tier hosting can't fit the full index | Demo on the `focused` corpus; report `full` results from local runs |
+
+---
+
+## 11. Open decisions (defaults assumed, change any time)
+
+| Decision | Default in this plan | Alternatives |
+|---|---|---|
+| LLM provider | Claude Sonnet (generation) + Haiku (judge), Ollama fallback | OpenAI, Gemini, fully local |
+| API budget | ~$20–40 total | Lower: more local models, fewer runs |
+| Live demo hosting | Hugging Face Spaces (Docker) + Qdrant Cloud free tier, `focused` corpus | Fly.io / Render, local only |
+| UI | Streamlit | Next.js, if targeting full-stack roles |
+| Target role emphasis | AI/ML engineer (eval rigor first) | Backend (more infra), full-stack (richer UI) |
