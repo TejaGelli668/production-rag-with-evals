@@ -102,10 +102,10 @@ Splits are fixed with a seed and committed as ID lists in `evals/splits/`.
 | PDF parsing | `pymupdf` (baseline) vs `docling` (table-aware) | Compared in an experiment |
 | Embeddings | `BAAI/bge-small-en-v1.5` locally (baseline); try `bge-m3` or an API model | Free, no API key needed for retrieval |
 | Sparse / BM25 | Qdrant sparse vectors (BM25 / SPLADE) | Hybrid search inside one store |
-| Vector store | **Qdrant** (Docker) | Native hybrid search and payload filtering |
+| Vector store | **Qdrant**: embedded mode now, Docker server from Phase 4 | Native hybrid search and payload filtering |
 | Reranker | `BAAI/bge-reranker-v2-m3` (cross-encoder) | Strong open-source reranker |
-| Generator LLM | Claude Sonnet (`claude-sonnet-5-5`), behind a provider interface | Strong numerical reasoning; can be swapped |
-| Judge LLM | Claude Haiku (`claude-haiku-4-5-20251001`) | Cheap; checked against human labels |
+| Generator LLM | Claude Sonnet (`claude-sonnet-5-5`), behind a provider interface; Ollama `qwen3:14b` until an API key is added | Strong numerical reasoning; can be swapped |
+| Judge LLM | Claude Haiku (`claude-haiku-4-5`) | Cheap; checked against human labels |
 | Local fallback | Ollama | Runs with no API key |
 | API | FastAPI with streaming (SSE) | Production-style service |
 | UI | Streamlit | Quick to build; shows answer, cited pages and PDF snippet |
@@ -152,7 +152,7 @@ Each step changes **one thing**, is run on `dev`, and is logged to `evals/result
 | # | Experiment | Hypothesis |
 |---|---|---|
 | E0 | Closed-book and oracle-context bounds | Sets the floor and ceiling |
-| E1 | **Baseline:** pymupdf, fixed 512-token chunks, dense, k=5 | Reference point |
+| E1 | **Baseline:** pymupdf, fixed 500-token chunks (50 overlap), dense, k=5 | Reference point |
 | E2 | Chunking: fixed vs recursive vs page-level vs section-aware | Page and section chunks fit the evidence labels better |
 | E3 | Table-aware parsing (docling) | Big improvement on numerical-reasoning questions |
 | E4 | Hybrid (dense + BM25, RRF) | Helps with exact terms (tickers, line items, "FY2019") |
@@ -220,12 +220,18 @@ Notes from Phase 0:
 - `full` corpus = **360** documents: the metadata file has 361 rows, and one (`FOOTLOCKER_2023_annualreport`) appears twice; the first row is kept. 8 upstream PDFs have no metadata and are left out.
 - No OCR needed; table structure is the parsing challenge. Each company has a median of 9 filings, which are the hard distractors. 23% of questions need more than one page. See the implications section of the data report.
 
-### Phase 1: Baseline pipeline (~1–2 days)
-- [ ] Page-aware PDF parsing (pymupdf), fixed-size chunker, metadata extraction from `doc_name` and document info
-- [ ] Qdrant via Docker; embed and index in `focused` mode
-- [ ] Dense retrieval, plus generation with page citations through the LLM provider interface
-- [ ] CLI: `rag ask "..."`
+### Phase 1: Baseline pipeline (~1–2 days) ✅
+- [x] Page-aware PDF parsing (pymupdf) and a fixed-size token chunker (500 tokens, 50 overlap). Chunks may cross pages and record `page_start`/`page_end`; text is sliced by character offsets so original casing is kept. Company, doc type and fiscal year are copied onto every chunk
+- [x] Qdrant in **embedded mode** (`storage/qdrant`, no Docker; set `QDRANT_URL` to use a server). `focused` is indexed: 84 filings → 18,596 chunks in ~3 min on Apple M5 Pro (MPS). Ingestion resumes from a manifest
+- [x] Dense retrieval (bge-small-en-v1.5), with optional metadata filters (`--filter company=3M`)
+- [x] Generation with `[n]` citations resolved to document and page, through an LLM provider interface: Ollama (`qwen3:14b`, used for now) and Claude (`claude-sonnet-5-5`, adaptive thinking, `effort: medium`, server-side refusal fallback; tested with a fake client until an API key is added)
+- [x] CLI: `rag ingest`, `rag ask "..."`, `rag ask --id <financebench_id>` (shows the gold answer and marks retrieved chunks that overlap gold pages)
 - **Done when:** the CLI answers a FinanceBench question with cited pages
+
+Notes from Phase 1 (first answers from the baseline, not measured yet):
+- **Chunk boundaries split tables.** 3M FY2018 capex: a chunk overlapping the gold page was retrieved, but the capex line sat in the previous chunk, so the model correctly said "insufficient information". So Page Hit@k can over-credit, and Phase 2 should also check whether the evidence text itself was retrieved.
+- **No company awareness.** Boeing's tax-rate question retrieved Kraft Heinz, PayPal and Microsoft chunks. With `--filter company=Netflix --filter fiscal_year=2017`, the Netflix current-liabilities question went from a confidently wrong, cited $3,529.6M to the correct $5,466.31M. That's an early signal for E5.
+- **Wrong answers can still carry citations,** so the faithfulness and citation checks in Phase 2 are essential.
 
 ### Phase 2: Eval harness (~2 days)
 - [ ] Retrieval metrics (Doc Hit@k, Page Hit@k, MRR)

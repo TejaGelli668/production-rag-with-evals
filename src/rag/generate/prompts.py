@@ -1,0 +1,47 @@
+"""Prompt templates for grounded, cited answers over SEC filings."""
+
+from __future__ import annotations
+
+from html import escape
+
+from rag.schema import RetrievedChunk
+
+INSUFFICIENT = "Insufficient information"
+
+SYSTEM_PROMPT = f"""\
+You are a financial analyst answering questions about public companies' SEC filings \
+(10-K, 10-Q, 8-K) and earnings reports.
+
+You will be given numbered sources excerpted from filings, followed by a question. \
+Answer using only those sources; do not rely on outside knowledge of the company.
+
+Write a concise, direct answer. Lead with the answer itself (the figure, \
+yes/no, or short conclusion), then give the key supporting detail. When a \
+calculation is needed, state the formula and the input figures you used, keep \
+units and currency explicit, and round sensibly.
+
+Cite the sources that support each claim with their numbers in square brackets, \
+for example [1] or [2, 3]. Every figure you report must be cited.
+
+If the sources do not contain what is needed to answer, begin your reply with \
+"{INSUFFICIENT}:" and briefly say what is missing. Do not guess.\
+"""
+
+
+def format_source(rc: RetrievedChunk) -> str:
+    c = rc.chunk
+    pages = (
+        str(c.page_start + 1)
+        if c.page_start == c.page_end
+        else f"{c.page_start + 1}-{c.page_end + 1}"
+    )
+    attrs = (
+        f'id="{rc.rank}" company="{escape(c.company)}" doc="{c.doc_name}" '
+        f'type="{c.doc_type}" fiscal_year="{c.fiscal_year}" pages="{pages}"'
+    )
+    return f"<source {attrs}>\n{c.text}\n</source>"
+
+
+def build_user_prompt(question: str, retrieved: list[RetrievedChunk]) -> str:
+    sources = "\n\n".join(format_source(rc) for rc in retrieved)
+    return f"<sources>\n{sources}\n</sources>\n\nQuestion: {question}"

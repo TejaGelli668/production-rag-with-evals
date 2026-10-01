@@ -1,0 +1,16 @@
+# E1 baseline: PyMuPDF text, fixed-size token chunks, dense retrieval, top-5.
+name: baseline
+corpus: focused
+parser: pymupdf
+chunker:
+  type: fixed
+  size: 500      # tokens; bge-small's max input is 512 including special tokens
+  overlap: 50
+embedder:
+  model: BAAI/bge-small-en-v1.5
+retriever:
+  type: dense
+  top_k: 5
+generator:
+  provider: ollama          # switch to `anthropic` once ANTHROPIC_API_KEY is set
+  model: qwen3:14b          # anthropic: claude-sonnet-5-5
