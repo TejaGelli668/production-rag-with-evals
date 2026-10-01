@@ -1,0 +1,8 @@
+# E0 upper bound: the generator is handed the gold evidence pages directly.
+# The gap between this and a real config is the cost of imperfect retrieval.
+name: e0_oracle
+retriever:
+  type: oracle
+generator:
+  provider: ollama
+  model: qwen3:14b

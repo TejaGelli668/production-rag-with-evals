@@ -48,7 +48,8 @@ class EmbedderConfig(BaseModel):
 
 
 class RetrieverConfig(BaseModel):
-    type: Literal["dense"] = "dense"
+    # `oracle` and `none` are evaluation bounds (E0): the gold evidence pages, or no context.
+    type: Literal["dense", "oracle", "none"] = "dense"
     top_k: int = 5
 
 
@@ -57,9 +58,21 @@ class GeneratorConfig(BaseModel):
     model: str = "qwen3:14b"
     max_tokens: int = 16000
     # Anthropic only: thinking runs adaptively; effort controls its depth.
-    effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    # None omits the parameter (required for claude-haiku-4-5, which rejects it).
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
     # Ollama only: context window; the default (2-4k) would truncate retrieved context.
     num_ctx: int = 16384
+
+
+class JudgeConfig(GeneratorConfig):
+    """The grader model. Fixed across experiments so scores stay comparable.
+
+    Default is local until an Anthropic key is configured; the plan's judge is
+    claude-haiku-4-5 (a different model family from the generator under test).
+    """
+
+    max_tokens: int = 4000
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
 
 
 class PipelineConfig(BaseModel):

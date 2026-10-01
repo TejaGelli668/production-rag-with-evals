@@ -8,11 +8,12 @@ rag ask --id financebench_id_03029          # a benchmark question, shown with i
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import textwrap
 from pathlib import Path
 
-from rag.config import DEFAULT_CONFIG, Settings, load_config
+from rag.config import DEFAULT_CONFIG, JudgeConfig, Settings, load_config
 from rag.data.financebench import Question, load_questions
 from rag.generate.llm import LLMError
 from rag.pipeline import IndexNotFoundError, RAGPipeline
@@ -94,6 +95,97 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def _judge_config(args: argparse.Namespace) -> JudgeConfig:
+    cfg = JudgeConfig()
+    if args.judge_provider:
+        cfg.provider = args.judge_provider
+    if args.judge_model:
+        cfg.model = args.judge_model
+    return cfg
+
+
+def cmd_eval(args: argparse.Namespace) -> int:
+    from rag.evals.runner import RunMismatchError, run_eval, run_retrieval_eval
+    from rag.evals.summary import render_summary
+
+    cfg = load_config(args.config)
+    try:
+        if args.retrieval_only:
+            run_dir = run_retrieval_eval(cfg, args.split, limit=args.limit)
+        else:
+            run_dir = run_eval(
+                cfg,
+                args.split,
+                _judge_config(args),
+                reps=args.reps,
+                limit=args.limit,
+                fresh=args.fresh,
+                use_judges=not args.no_judge,
+            )
+    except (IndexNotFoundError, RunMismatchError, LLMError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(render_summary(json.loads((run_dir / "summary.json").read_text())))
+    print(f"\nrun: {run_dir}")
+    return 0
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    from rag.evals.summary import compare
+
+    print(compare([_run_dir(d) for d in args.runs], args.metric or None))
+    return 0
+
+
+def cmd_check_judge(args: argparse.Namespace) -> int:
+    from rag.evals.judge_check import check_judges, write_report
+    from rag.evals.judges import Judges
+    from rag.generate.llm import make_llm
+
+    judge_cfg = _judge_config(args)
+    report = check_judges(Judges(make_llm(judge_cfg, Settings())), args.split, args.limit)
+    print(write_report(report, judge_cfg.model))
+    for f in report["failures"][:10]:
+        print(f"  ✗ {f['check']} {f['case']}: {f['detail']}")
+    return 0
+
+
+def _run_dir(path: Path) -> Path:
+    from rag.evals.runner import RUNS_DIR
+
+    run_dir = path if path.exists() else RUNS_DIR / path.name
+    if not (run_dir / "results.jsonl").exists():
+        raise SystemExit(f"error: no results in {run_dir}")
+    return run_dir
+
+
+def cmd_label(args: argparse.Namespace) -> int:
+    from rag.evals.labeling import LABELS_PATH, label_run
+
+    added = label_run(_run_dir(args.run))
+    print(f"\n{added} labels added to {LABELS_PATH}")
+    return 0
+
+
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    from rag.evals.labeling import calibrate
+
+    report = calibrate(_run_dir(args.run))
+    print(
+        f"{report['run']}: {report['labeled']} labeled answers · agreement "
+        f"{report['agreement']:.0%} · Cohen's kappa {report['cohens_kappa']:.2f}"
+    )
+    for d in report["disagreements"]:
+        print(f"  ✗ {d['prompt_id']}: human={d['human']} judge={d['judge']}")
+        _print_wrapped(d["judge_reasoning"], indent="      ")
+    return 0
+
+
+def _add_judge_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--judge-provider", choices=["ollama", "anthropic"])
+    p.add_argument("--judge-model", help="e.g. claude-haiku-4-5 (default: local qwen3:14b)")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="rag", description="RAG over SEC filings")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -116,6 +208,42 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_ask.add_argument("--show-context", action="store_true", help="print retrieved chunk text")
     p_ask.set_defaults(func=cmd_ask)
+
+    p_eval = sub.add_parser("eval", help="run a config on an eval split and score it")
+    p_eval.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    p_eval.add_argument(
+        "--split", default="dev", choices=["dev", "test", "ci_smoke", "unanswerable"]
+    )
+    p_eval.add_argument("--reps", type=int, default=1)
+    p_eval.add_argument("--limit", type=int, help="only the first N cases")
+    p_eval.add_argument(
+        "--fresh", action="store_true", help="discard previous results for this run"
+    )
+    p_eval.add_argument(
+        "--retrieval-only", action="store_true", help="retrieval metrics at k=1..20, no LLM"
+    )
+    p_eval.add_argument("--no-judge", action="store_true", help="programmatic metrics only")
+    _add_judge_args(p_eval)
+    p_eval.set_defaults(func=cmd_eval)
+
+    p_cmp = sub.add_parser("compare", help="compare eval runs (paired on shared cases)")
+    p_cmp.add_argument("runs", nargs="+", type=Path, help="run dirs or names under evals/runs/")
+    p_cmp.add_argument("--metric", action="append", help="limit to these metrics (repeatable)")
+    p_cmp.set_defaults(func=cmd_compare)
+
+    p_chk = sub.add_parser("check-judge", help="known-good/known-bad sanity checks for judges")
+    p_chk.add_argument("--split", default="dev")
+    p_chk.add_argument("--limit", type=int)
+    _add_judge_args(p_chk)
+    p_chk.set_defaults(func=cmd_check_judge)
+
+    p_lab = sub.add_parser("label", help="hand-label a run's answers for judge calibration")
+    p_lab.add_argument("run", type=Path, help="run dir or name under evals/runs/")
+    p_lab.set_defaults(func=cmd_label)
+
+    p_cal = sub.add_parser("calibrate", help="judge vs human agreement on labeled answers")
+    p_cal.add_argument("run", type=Path, help="run dir or name under evals/runs/")
+    p_cal.set_defaults(func=cmd_calibrate)
 
     args = parser.parse_args(argv)
     return args.func(args)

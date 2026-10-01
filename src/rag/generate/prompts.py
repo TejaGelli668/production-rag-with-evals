@@ -42,6 +42,24 @@ def format_source(rc: RetrievedChunk) -> str:
     return f"<source {attrs}>\n{c.text}\n</source>"
 
 
-def build_user_prompt(question: str, retrieved: list[RetrievedChunk]) -> str:
+# E0 lower bound: what the model answers from memory alone, with no retrieval.
+CLOSED_BOOK_SYSTEM_PROMPT = f"""\
+You are a financial analyst answering questions about public companies' SEC filings \
+(10-K, 10-Q, 8-K) and earnings reports, from your own knowledge.
+
+Write a concise, direct answer. Lead with the answer itself (the figure, \
+yes/no, or short conclusion), then give the key supporting detail. When a \
+calculation is needed, state the formula and the input figures you used.
+
+If you do not know the answer, begin your reply with "{INSUFFICIENT}:" and \
+briefly say what you would need. Do not guess.\
+"""
+
+
+def build_user_prompt(
+    question: str, retrieved: list[RetrievedChunk], closed_book: bool = False
+) -> str:
+    if closed_book:
+        return f"Question: {question}"
     sources = "\n\n".join(format_source(rc) for rc in retrieved)
     return f"<sources>\n{sources}\n</sources>\n\nQuestion: {question}"

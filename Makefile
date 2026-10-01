@@ -1,4 +1,4 @@
-.PHONY: setup data data-focused splits explore ingest ask test lint format check
+.PHONY: setup data data-focused splits explore ingest ask eval eval-retrieval check-judge test lint format check
 
 setup:  ## Install dependencies and git hooks
 	uv sync
@@ -23,6 +23,17 @@ ingest:  ## Parse, chunk, embed and index the corpus for CONFIG (resumable)
 
 ask:  ## Ask a question: make ask Q="..." or make ask ID=financebench_id_03029
 	uv run rag ask $(if $(ID),--id $(ID),"$(Q)") --config $(CONFIG)
+
+SPLIT ?= dev
+
+eval:  ## Run CONFIG on SPLIT with judges: make eval CONFIG=configs/e0_oracle.yaml
+	uv run rag eval --config $(CONFIG) --split $(SPLIT)
+
+eval-retrieval:  ## Retrieval-only metrics at k=1..20 (no LLM calls)
+	uv run rag eval --config $(CONFIG) --split $(SPLIT) --retrieval-only
+
+check-judge:  ## Known-good / known-bad sanity checks for the judges
+	uv run rag check-judge --split $(SPLIT)
 
 test:
 	uv run pytest

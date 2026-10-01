@@ -233,14 +233,22 @@ Notes from Phase 1 (first answers from the baseline, not measured yet):
 - **No company awareness.** Boeing's tax-rate question retrieved Kraft Heinz, PayPal and Microsoft chunks. With `--filter company=Netflix --filter fiscal_year=2017`, the Netflix current-liabilities question went from a confidently wrong, cited $3,529.6M to the correct $5,466.31M. That's an early signal for E5.
 - **Wrong answers can still carry citations,** so the faithfulness and citation checks in Phase 2 are essential.
 
-### Phase 2: Eval harness (~2 days)
-- [ ] Retrieval metrics (Doc Hit@k, Page Hit@k, MRR)
-- [ ] Correctness judge with numeric tolerance, faithfulness judge, citation check
-- [ ] `run_eval.py` → results JSON, and `compare.py` → diff table
-- [ ] Hand-label ~60 answers and calibrate the judge
-- [ ] Write the `custom` unanswerable set
-- [ ] Run E0 (bounds) and E1 (baseline)
+### Phase 2: Eval harness (~2 days) 🚧 in progress
+- [x] Retrieval metrics (Doc Hit@k, Page Hit@k, Page Recall@k, MRR), plus **evidence coverage@k** (added because Phase 1 showed page overlap over-credits retrieval)
+- [x] Correctness judge (rubric with unit, scale and rounding tolerance) and faithfulness judge (claim-by-claim against the retrieved sources), using structured JSON output; a programmatic `numeric_match` cross-check; citation checks (`has_citation`, `cites_gold_page`, `invalid_citations`)
+- [x] `rag eval` → `evals/runs/<run>/` (results, errors sidecar, full traces, summary with bootstrap CIs); `rag compare` → paired differences; `--retrieval-only` sweeps k=1..20 with no LLM calls
+- [x] Judge sanity checks (`rag check-judge`): 4-case smoke test passes all 6 checks; full `dev` run pending
+- [x] Labeling and calibration tooling (`rag label`, `rag calibrate`, Cohen's kappa)
+- [ ] **Hand-label ~60 answers** (needs a human) and calibrate the judge
+- [x] Drafted the `unanswerable` set (30 cases in 4 categories). **Needs human review**
+- [x] E1 baseline on `dev`: 14% correct, 67% refused, Doc Hit@5 92%, Page Hit@5 22% (see `evals/results/baseline__dev.json`)
+- [ ] E0 bounds (oracle, closed-book), retrieval sweep, full judge checks: running
 - **Done when:** one command produces a full metrics report for any config
+
+Notes from Phase 2 so far:
+- The judge is currently `qwen3:14b`, the same model as the generator, because there's no API key. Runs flag this. Switch to `claude-haiku-4-5` once a key is set, and re-run the bounds and baseline so all numbers come from one judge.
+- Spot check of all 16 judged baseline answers: the correctness verdicts looked right. The faithfulness judge missed an arithmetic error (`financebench_id_04254`: 1,263 + 636 reported as 2,100).
+- One baseline case hit a 600 s Ollama timeout. It was logged as an infra error, not a wrong answer, and a re-run retries it.
 
 ### Phase 3: Experiments (~2–3 days)
 - [ ] Run E2–E9 on `dev` in `full` mode, one change at a time

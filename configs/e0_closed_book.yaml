@@ -1,0 +1,7 @@
+# E0 lower bound: no retrieval; the generator answers from memory alone.
+name: e0_closed_book
+retriever:
+  type: none
+generator:
+  provider: ollama
+  model: qwen3:14b

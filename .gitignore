@@ -14,3 +14,6 @@ __pycache__/
 .env
 .ipynb_checkpoints/
 .DS_Store
+
+# Raw eval runs (traces can be large); summaries are committed under evals/results/
+/evals/runs/

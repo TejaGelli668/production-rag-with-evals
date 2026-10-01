@@ -68,3 +68,4 @@ class Answer(BaseModel):
     llm: LLMResponse
     retrieval_latency_s: float
     config_name: str
+    user_prompt: str  # exactly what the generator saw, kept for eval traces
