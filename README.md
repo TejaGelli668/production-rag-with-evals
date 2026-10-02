@@ -152,7 +152,9 @@ and no API keys. It downloads a 51-filing CI corpus (the 20 `ci_smoke` questions
 plus same-company filings from neighbouring years as distractors), indexes it on the CI
 runner's CPU, and fails the build if retrieval drops below the thresholds in
 [`evals/gate.yaml`](evals/gate.yaml). The gate was checked against known regressions:
-turning off the filters or switching to 250-token chunks both fail it.
+turning off the filters or switching to 250-token chunks both fail it. The built index is
+cached between runs (a cold build is ~55 min on GitHub's 2-core runners, a cached run ~2 min),
+and the metrics on the Linux CPU runner match a local Apple GPU run exactly.
 
 ## Limitations
 

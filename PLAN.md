@@ -272,7 +272,7 @@ Notes from Phase 2 so far:
 
 Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra changes: one embedded Qdrant folder per collection (embedded Qdrant allows one process per folder); an on-disk parse cache with parallel pre-parsing (`scripts/preparse.py`).
 
-### Phase 4: Service, UI and observability 🚧 in progress
+### Phase 4: Service, UI and observability ✅ (Docker deferred)
 **Decisions (2026-10-02):** fully local. The LLM is Ollama `qwen3:14b` with no cloud API keys. Docker Compose moves to the very end.
 - [x] FastAPI: `/ask`, `/ask/stream` (SSE: sources → tokens → answer), `/feedback`, `/health`, `/pages/{doc}/{page}.png`; request and feedback logs joined by `request_id`; one pipeline call at a time (pipeline isn't thread-safe); the streaming pipeline runs on one thread so trace context stays intact
 - [x] Streamlit: streaming answer, source cards (filing, page, rerank score, cited), rendered PDF page, 👍/👎 via `st.feedback`, example questions, intro on the empty state
@@ -282,11 +282,13 @@ Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra
 - **Done when:** a fresh clone, `make data && make ingest && make serve` + `make ui`, works end to end
 
 ### Phase 5: CI, demo and write-up (~1 day)
-- [ ] `ci.yml`: lint + unit tests on every push and PR
-- [ ] Eval gate, **retrieval-only** (no LLM in CI): `ci_smoke` retrieval metrics against committed thresholds, on a small cached index
-- [ ] Demo: local only; record a short screen capture or GIF of the UI for the README
+- [x] `ci.yml`: lint + 81 unit tests on every push and PR (Linux, CPU-only torch)
+- [x] Eval gate, **retrieval-only** (no LLM): `ci_smoke` on a 51-filing CI corpus (gold filings plus neighbouring-year distractors), thresholds in `evals/gate.yaml`. Verified to fail when filters are disabled or chunks shrink to 250 tokens. Metrics on GitHub's Linux CPU match the local Mac GPU run exactly
+- [x] Built index cached between CI runs: the cold build is ~55 min on a 2-core runner, cached runs are ~2 min
+- [x] Demo: GIF of the UI in the README (local app, recorded from the browser)
 - [ ] Human judge calibration (`rag label` + `rag calibrate`), plus review of the drafted unanswerable set (both need a human)
-- [ ] README: architecture diagram, results, limitations, how to run; make the repo public
+- [x] README: architecture diagram (Mermaid), results, kept/dropped experiments, limitations, how to run
+- [ ] Make the repo public (owner's decision)
 - [ ] Last: Docker Compose
 - **Done when:** the repo is public and the README tells the story with numbers
 
