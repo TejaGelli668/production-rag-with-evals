@@ -124,4 +124,4 @@ def test_unanswerable_cases_are_well_formed():
     assert len(cases) >= 30
     assert len({c.case_id for c in cases}) == len(cases)
     assert all(not c.answerable and is_refusal(c.gold_answer) for c in cases)
-    assert all(c.tags and "needs human review" in c.source for c in cases)
+    assert all(c.tags and "verify_unanswerable" in c.source for c in cases)

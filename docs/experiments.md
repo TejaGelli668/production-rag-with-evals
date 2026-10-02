@@ -278,5 +278,9 @@ filings never disclose).
 Read this next to the other side of the trade-off: on answerable `test` questions the system
 declines 26% of the time, and in 6 of those cases the evidence had been retrieved. Perfect
 refusal on these 30 partly reflects a generally cautious generator. These cases were drafted
-by Claude from corpus coverage and still **need human review**; they are also easier than
-real ambiguity, since none of them is a near-miss of an answerable question.
+by Claude from corpus coverage and verified against the corpus by
+[`scripts/verify_unanswerable.py`](../scripts/verify_unanswerable.py): absent companies are not
+in the corpus (though several are named in filings, e.g. Goldman Sachs in 47), future periods
+come after the company's latest filing, and the nonexistent or undisclosed items appear in none
+of that company's filings. They are easier than real ambiguity, since none is a near-miss of
+an answerable question.

@@ -266,7 +266,7 @@ Notes from Phase 2 so far:
 - [x] Error analysis (`rag analyze`): wrong-filing errors 16 → 1; the remaining failures are mostly wrong page in the right filing (19/30)
 - [x] README charts (`scripts/make_charts.py`, light/dark SVG)
 - [x] **Final config = `stack_filter_rerank`.** Held-out `test` (n=100, run once): **15% → 49% correct, Δ +0.34 [+0.24, +0.44]\***; wrong-filing errors 53 → 4
-- [x] Unanswerable set: 30/30 correctly declined (the set still needs human review); the trade-off is a 26% refusal rate on answerable `test` questions
+- [x] Unanswerable set: 30/30 correctly declined (cases verified against the corpus by `scripts/verify_unanswerable.py`); the trade-off is a 26% refusal rate on answerable `test` questions
 - [x] Full judge sanity checks on `dev`: correctness judge ≥ 98% on every check; faithfulness judge 84% both ways (treat as approximate)
 - **Done when:** the results table shows a measured gain for each component that was kept
 
@@ -286,7 +286,8 @@ Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra
 - [x] Eval gate, **retrieval-only** (no LLM): `ci_smoke` on a 51-filing CI corpus (gold filings plus neighbouring-year distractors), thresholds in `evals/gate.yaml`. Verified to fail when filters are disabled or chunks shrink to 250 tokens. Metrics on GitHub's Linux CPU match the local Mac GPU run exactly
 - [x] Built index cached between CI runs: the cold build is ~55 min on a 2-core runner, cached runs are ~2 min
 - [x] Demo: GIF of the UI in the README (local app, recorded from the browser)
-- [ ] Human judge calibration (`rag label` + `rag calibrate`), plus review of the drafted unanswerable set (both need a human)
+- [ ] Human judge calibration (`rag label` + `rag calibrate`): needs a human
+- [x] Unanswerable set verified against the corpus by script (owner accepted this in place of a manual review)
 - [x] README: architecture diagram (Mermaid), results, kept/dropped experiments, limitations, how to run
 - [ ] Make the repo public (owner's decision)
 - [ ] Last: Docker Compose

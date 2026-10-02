@@ -9,7 +9,7 @@ How this project measures a RAG configuration, and how far each number can be tr
 | `dev` | 50 | FinanceBench, written by financial analysts | Tuning and experiments |
 | `test` | 100 | FinanceBench | Held out; final numbers only |
 | `ci_smoke` | 20 (subset of `dev`) | FinanceBench | CI regression gate |
-| `unanswerable` | 30 | **Drafted by Claude from corpus coverage; needs human review** | Does the system decline when it should? |
+| `unanswerable` | 30 | Drafted by Claude from corpus coverage; verified against the corpus by script | Does the system decline when it should? |
 
 The unanswerable cases come in four kinds: companies absent from the corpus (10), fiscal
 periods after every filing (8), plausible-sounding items that don't exist (7), and details

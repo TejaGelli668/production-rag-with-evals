@@ -171,8 +171,9 @@ and the metrics on the Linux CPU runner match a local Apple GPU run exactly.
   M5 Pro shared with the local LLM.
 - **Small samples:** with 50 `dev` questions, CIs are about ±14 points, so only large
   effects were resolvable.
-- **Draft unanswerable set:** the 30 unanswerable questions were drafted by an AI from
-  corpus coverage and still need human review.
+- **Unanswerable set:** the 30 unanswerable questions were drafted by an AI and verified
+  against the corpus by script, not by a human. None is a near-miss of an answerable question,
+  so they are easier than real ambiguity.
 
 ## Data
 
