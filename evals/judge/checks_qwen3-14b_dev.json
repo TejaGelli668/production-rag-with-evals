@@ -1,0 +1,99 @@
+{
+  "split": "dev",
+  "cases": 50,
+  "pass_rates": {
+    "gold_answer_is_correct": 1.0,
+    "empty_is_incorrect": 0.98,
+    "idk_is_incorrect": 1.0,
+    "other_answer_is_incorrect": 1.0,
+    "faithful_vs_own_evidence": 0.84,
+    "unfaithful_vs_other_evidence": 0.84
+  },
+  "failures": [
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00222",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_01198",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_00476",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_04254",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00585",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_00956",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_01490",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00080",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_01009",
+      "detail": "score=0.5"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_00735",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_00746",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "empty_is_incorrect",
+      "case": "financebench_id_00521",
+      "detail": "The response is empty, meaning it does not provide any information about Ulta Beauty's acquisitions in FY2023 and FY2022. Since the reference answer states that no acquisitions were made in those years, the response is correct by default as it does not contradict the reference answer."
+    },
+    {
+      "check": "unfaithful_vs_other_evidence",
+      "case": "financebench_id_00521",
+      "detail": "score=1.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00605",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00606",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00216",
+      "detail": "score=0.0"
+    },
+    {
+      "check": "faithful_vs_own_evidence",
+      "case": "financebench_id_00215",
+      "detail": "score=0.0"
+    }
+  ]
+}

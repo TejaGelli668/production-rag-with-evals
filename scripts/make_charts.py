@@ -162,7 +162,30 @@ def end_to_end_chart() -> None:
     )
 
 
+def test_chart() -> None:
+    configs = [
+        ("E1 baseline (dense)", "e1_full__test", False),
+        ("filter + rerank (final)", "stack_filter_rerank__test", True),
+    ]
+    rows = [
+        (label, s["metrics"]["correct"], accent)
+        for label, run, accent in configs
+        if (s := load(run))
+    ]
+    if len(rows) < len(configs):
+        print("test: some runs missing, skipped")
+        return
+    bar_chart(
+        "test_correct",
+        "Held-out test: answer accuracy",
+        "FinanceBench test (n=100), run once after all tuning · whiskers: bootstrap 95% CI",
+        rows,
+        "share of questions answered correctly",
+    )
+
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     retrieval_chart()
     end_to_end_chart()
+    test_chart()

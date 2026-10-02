@@ -1,0 +1,115 @@
+{
+  "run": "stack_filter_rerank__unanswerable",
+  "config": "stack_filter_rerank",
+  "split": "unanswerable",
+  "generator": "qwen3:14b",
+  "retriever": "dense",
+  "judge": [
+    "qwen3:14b"
+  ],
+  "judge_is_generator": true,
+  "cases": 30,
+  "rows": 30,
+  "truncated": 0,
+  "unresolved_errors": 0,
+  "metrics": {
+    "correct": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 30
+    },
+    "refused": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 30
+    }
+  },
+  "by_tag": {
+    "absent_company": {
+      "correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 10
+      },
+      "refused": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 10
+      }
+    },
+    "future_period": {
+      "correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 8
+      },
+      "refused": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 8
+      }
+    },
+    "nonexistent_item": {
+      "correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 7
+      },
+      "refused": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 7
+      }
+    },
+    "undisclosed_detail": {
+      "correct": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 5
+      },
+      "refused": {
+        "mean": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n": 5
+      }
+    }
+  },
+  "perf": {
+    "generation_latency_p50_s": 10.1295,
+    "generation_latency_p95_s": 13.95,
+    "input_tokens_mean": 3887.866666666667,
+    "output_tokens_mean": 28.666666666666668,
+    "judge_input_tokens_mean": 0.0,
+    "retrieval_latency_p50_s": 4.099
+  }
+}

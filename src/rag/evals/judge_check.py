@@ -84,7 +84,8 @@ def check_judges(judges: Judges, split: str = "dev", limit: int | None = None) -
 def write_report(report: dict[str, Any], judge_model: str) -> str:
     CHECKS_DIR.mkdir(parents=True, exist_ok=True)
     name = judge_model.replace(":", "-").replace("/", "-")
-    (CHECKS_DIR / f"checks_{name}_{report['split']}.json").write_text(json.dumps(report, indent=2))
+    path = CHECKS_DIR / f"checks_{name}_{report['split']}.json"
+    path.write_text(json.dumps(report, indent=2) + "\n")
     lines = [
         f"Judge checks · `{judge_model}` · {report['cases']} {report['split']} cases",
         "",

@@ -27,6 +27,9 @@ question, top-50 reranked to 5 with bge-reranker-v2-m3.
 | E9 | Embedding swap (bge-m3) | — | Deferred (~2 h re-index) |
 | **All** | **`e1_full` → `stack_filter_rerank`** | **Correct 12% → 40%, Δ +0.28 [+0.16, +0.40]\*** | |
 
+**Held-out `test` (n = 100, run once after all decisions were made): correct 15% → 49%,
+Δ +0.34 [+0.24, +0.44]\*.** See [Held-out test](#held-out-test).
+
 ## E0: bounds (focused corpus, judged)
 
 | Config | Correct | Refused | What it shows |
@@ -226,3 +229,54 @@ This targets the 8 generation failures: refusals despite retrieved evidence, and
 **Cost:** median generation latency 10.4 s → 15.9 s (longer context and answers), and
 median retrieval latency 0.3 s → 6.7 s because of reranking (measured on a GPU shared with
 the local LLM).
+
+## Held-out test
+
+The final configuration and the `e1_full` baseline were each run once on the 100 `test`
+questions, after every decision above had been made on `dev`.
+
+| `test`, n = 100 | `e1_full` | `stack_filter_rerank` | Δ (paired, 95% CI) |
+|---|---|---|---|
+| **Correct** | 15% | **49%** | **+0.34 [+0.24, +0.44]\*** |
+| Refused | 66% | 26% | −0.40 [−0.50, −0.29]\* |
+| Fully faithful (answered) | 91% | 93% | 0.00 [−0.16, +0.16] |
+| Doc hit@5 | 0.44 | 0.95 | +0.51 [+0.39, +0.62]\* |
+| Page hit@5 | 0.16 | 0.57 | +0.41 [+0.30, +0.51]\* |
+| Evidence coverage@5 | 0.55 | 0.71 | +0.16 [+0.11, +0.20]\* |
+
+| Failure stage (`rag analyze`) | `e1_full` | `stack_filter_rerank` |
+|---|---|---|
+| wrong filing | 53 | **4** |
+| wrong page (right filing) | 24 | 26 |
+| evidence missing | 1 | 3 |
+| refused although evidence was retrieved | 3 | 6 |
+| wrong although evidence was retrieved | 4 | 12 |
+| correct | 15 | **49** |
+
+- **The improvement holds on unseen questions,** and it's larger than on `dev` (+34 vs +28
+  points); the two estimates' intervals overlap. Retrieval quality and faithfulness match `dev`
+  closely, so the gains were not overfit to the tuning questions.
+- **The bottleneck is shifting toward the generator.** With retrieval fixed, 18 of 51 failures
+  happen after the evidence was retrieved (12 wrong answers, 6 refusals), versus 8 of 30 on
+  `dev`. Together with the 54% oracle ceiling, this points to the generator (local
+  `qwen3:14b`) as the next lever.
+
+## Declining when it should
+
+The final configuration was run on the 30 `unanswerable` cases (questions about companies
+outside the corpus, fiscal periods after every filing, items that don't exist, and details
+filings never disclose).
+
+| Category | Correctly declined |
+|---|---|
+| absent company | 10 / 10 |
+| future period | 8 / 8 |
+| nonexistent item | 7 / 7 |
+| undisclosed detail | 5 / 5 |
+| **Total** | **30 / 30** |
+
+Read this next to the other side of the trade-off: on answerable `test` questions the system
+declines 26% of the time, and in 6 of those cases the evidence had been retrieved. Perfect
+refusal on these 30 partly reflects a generally cautious generator. These cases were drafted
+by Claude from corpus coverage and still **need human review**; they are also easier than
+real ambiguity, since none of them is a near-miss of an answerable question.

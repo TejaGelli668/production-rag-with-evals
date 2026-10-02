@@ -78,12 +78,30 @@ Faithfulness and citations aren't scored for refusals or for the closed-book bou
   about 90% agreement on clear-cut cases, the judge prompt needs another iteration before its
   scores can steer decisions.
 
+### Results for the local judge (`qwen3:14b`, 50 `dev` cases)
+
+| Check | Pass rate |
+|---|---|
+| gold answer graded correct | 100% |
+| empty answer graded incorrect | 98% |
+| "I don't know" graded incorrect | 100% |
+| another question's gold answer graded incorrect | 100% |
+| faithfulness: gold answer vs its own evidence counts as supported | 84% |
+| faithfulness: gold answer vs another question's evidence counts as unsupported | 84% |
+
+The **correctness judge passes its sanity checks** (≥ 98% on every check), so the accuracy
+numbers rest on solid ground, pending human calibration. The **faithfulness judge is
+weaker**: it misjudges about 1 in 6 clear-cut cases in each direction, and it missed an
+arithmetic error in a spot check. Treat faithfulness scores as approximate. Report
+`evals/judge/checks_qwen3-14b_dev.json` lists every failure.
+
 ## Known limitations
 
-- **The judge is currently the generator** (`qwen3:14b`), so it may favour its own phrasing.
-  The planned judge is `claude-haiku-4-5`, a different model family; switch with
-  `--judge-provider anthropic --judge-model claude-haiku-4-5` once an API key is set.
-  Judge-graded numbers from different judges are not comparable.
+- **The judge is the generator** (`qwen3:14b`), so it may favour its own phrasing. The project
+  deliberately runs fully locally, so there is no independent cloud judge; the sanity checks
+  above and human calibration (`rag label` / `rag calibrate`) are the safeguards. The judge
+  can be swapped with `--judge-provider` / `--judge-model`, but judge-graded numbers from
+  different judges are not comparable.
 - **Noise:** with 50 `dev` cases, a pass-rate CI is roughly ±14 points. Only differences
   whose paired CI excludes zero should drive decisions, and smaller effects need the `test`
   split or more cases.
