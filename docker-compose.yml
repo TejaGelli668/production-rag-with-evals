@@ -1,0 +1,80 @@
+# The full stack: API, UI, Qdrant (server mode) and Phoenix tracing.
+# Not yet run by the author; see docs/docker.md for the steps and known caveats.
+#
+#   docker compose up -d qdrant phoenix
+#   docker compose run --rm api rag ingest --config configs/stack_filter_rerank.yaml
+#   docker compose up -d
+#
+# The LLM runs in Ollama on the host by default (on a Mac, Docker can't use the Apple GPU,
+# so containerized Ollama would be CPU-only and very slow). On a Linux host without Ollama
+# installed, use the containerized one instead:
+#   OLLAMA_HOST=http://ollama:11434 docker compose --profile ollama up -d
+
+x-app: &app
+  build: .
+  image: production-rag:latest
+  environment:
+    QDRANT_URL: http://qdrant:6333
+    OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+    RAG_CONFIG: ${RAG_CONFIG:-configs/stack_filter_rerank.yaml}
+    RAG_TRACING: "1"
+    PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+  volumes:
+    - ./data:/app/data            # FinanceBench PDFs (`make data` on the host, or see docs)
+    - app_storage:/app/storage    # ingest manifests, parse cache, request/feedback logs
+    - hf_cache:/cache/huggingface # embedding + reranker models (~2.4 GB, downloaded once)
+  extra_hosts:
+    - host.docker.internal:host-gateway   # lets Linux hosts reach Ollama on the host
+
+services:
+  api:
+    <<: *app
+    command: ["uvicorn", "rag.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - qdrant
+      - phoenix
+
+  ui:
+    <<: *app
+    command: ["streamlit", "run", "ui/app.py", "--server.address", "0.0.0.0",
+              "--server.port", "8501", "--server.headless", "true"]
+    environment:
+      RAG_API_URL: http://api:8000             # server-side calls
+      RAG_API_PUBLIC_URL: http://localhost:8000 # page images, loaded by your browser
+    ports:
+      - "8501:8501"
+    healthcheck:
+      disable: true   # the image's check targets the API
+    depends_on:
+      - api
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  phoenix:
+    image: arizephoenix/phoenix:version-20.19.0
+    ports:
+      - "6006:6006"
+    volumes:
+      - phoenix_data:/root/.phoenix   # path may differ by image version; see docs/docker.md
+
+  ollama:
+    image: ollama/ollama:0.35.0
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  app_storage:
+  hf_cache:
+  qdrant_storage:
+  phoenix_data:
+  ollama_models:

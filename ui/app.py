@@ -16,6 +16,9 @@ import httpx
 import streamlit as st
 
 API_URL = os.environ.get("RAG_API_URL", "http://localhost:8000")
+# Page images are loaded by the viewer's browser, which may not resolve the server-side
+# hostname (e.g. `api` inside Docker Compose), so they get their own URL.
+PUBLIC_API_URL = os.environ.get("RAG_API_PUBLIC_URL", API_URL)
 EXAMPLES = [
     "What is the FY2018 capital expenditure amount (in USD millions) for 3M? Give a response "
     "based on the cash flow statement.",
@@ -73,7 +76,7 @@ def render_sources(sources: list[dict], show_text: bool) -> None:
             if show_text:
                 cols[0].text(s["text"][:3000])
             cols[-1].image(
-                f"{API_URL}/pages/{s['doc_name']}/{s['page_start']}.png",
+                f"{PUBLIC_API_URL}/pages/{s['doc_name']}/{s['page_start']}.png",
                 caption=f"{s['doc_name']}, {s['page_label']}",
             )
 

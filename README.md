@@ -119,6 +119,8 @@ make ui                                                      # chat -> http://lo
   `generate`, with the retrieved documents, scores, prompts and token counts.
 - **CLI:** `uv run rag ask --id financebench_id_03282` answers a benchmark question and shows
   the gold answer next to it.
+- **Docker:** a `Dockerfile` and `docker-compose.yml` (API, UI, Qdrant server, Phoenix) are
+  included but **untested**. See [docs/docker.md](docs/docker.md) for the steps and known risks.
 
 ## Evaluation
 

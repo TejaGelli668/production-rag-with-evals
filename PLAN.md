@@ -278,7 +278,7 @@ Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra
 - [x] Streamlit: streaming answer, source cards (filing, page, rerank score, cited), rendered PDF page, 👍/👎 via `st.feedback`, example questions, intro on the empty state
 - [x] Phoenix tracing (opt-in `RAG_TRACING=1`): OpenInference spans `rag.ask → retrieve → rerank`, `generate`, with documents, scores, prompts and token counts; FastAPI auto-instrumented
 - [x] Verified end to end on the real index: 3M capex ($1,577M ✓), Netflix liabilities ($5,466.31M ✓, wrong in Phase 1), NVIDIA (declined ✓), Boeing tax rate (signs flipped ✗, a generation error visible in the trace)
-- [ ] Docker Compose (api, qdrant server, ui, phoenix): **deferred to the end**
+- [x] Docker Compose (api, ui, qdrant server, phoenix; optional ollama): written but **untested**, since there's no Docker runtime on the dev machine. See `docs/docker.md` for steps and known risks
 - **Done when:** a fresh clone, `make data && make ingest && make serve` + `make ui`, works end to end
 
 ### Phase 5: CI, demo and write-up (~1 day)
@@ -289,8 +289,8 @@ Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra
 - [ ] Human judge calibration (`rag label` + `rag calibrate`): needs a human
 - [x] Unanswerable set verified against the corpus by script (owner accepted this in place of a manual review)
 - [x] README: architecture diagram (Mermaid), results, kept/dropped experiments, limitations, how to run
-- [ ] Make the repo public (owner's decision)
-- [ ] Last: Docker Compose
+- [x] Repo made public (commit emails rewritten to the GitHub no-reply address first); topics added
+- [x] Docker Compose: written, untested (see `docs/docker.md`)
 - **Done when:** the repo is public and the README tells the story with numbers
 
 **Total:** about 8–11 focused days.

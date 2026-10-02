@@ -1,0 +1,19 @@
+# Keep the build context small: data, indexes and caches are mounted, never copied.
+.git
+.github
+.claude
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.env
+data/
+storage/
+evals/runs/
+evals/results/
+evals/judge/
+docs/
+tests/
+*.md
+!README.md
