@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Production RAG With Evals</title>
+  <meta name="description" content="Question answering over 360 SEC filings that cites the page it used, tuned by measuring it against the FinanceBench benchmark. Held-out accuracy 15% to 49%.">
+  <meta property="og:title" content="Production RAG With Evals">
+  <meta property="og:description" content="Cited answers over 360 SEC filings. Held-out FinanceBench accuracy 15% → 49%, every component measured.">
+  <meta property="og:image" content="img/test_correct-light.svg">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2316233B'/%3E%3Crect x='7' y='13' width='18' height='6' fill='%23FFE27A'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap top__inner">
+      <a class="wordmark" href="#">Production RAG With Evals</a>
+      <nav aria-label="Sections">
+        <a href="#results">Results</a>
+        <a href="#explorer">Explore answers</a>
+        <a href="#experiments">Experiments</a>
+        <a href="#how">How it works</a>
+        <a class="nav__repo" href="https://github.com/TejaGelli668/production-rag-with-evals">Source code</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero__text">
+        <h1 id="hero-title">Answers from SEC filings that show their page.</h1>
+        <p class="lede">
+          A question-answering system over 360 real 10-K, 10-Q and 8-K filings. Every answer
+          cites the filing and page it came from, or says the information isn&rsquo;t there.
+          Each part of it was kept only if a measured experiment on the
+          <a href="https://github.com/patronus-ai/financebench">FinanceBench</a> benchmark showed it helped.
+        </p>
+        <p class="headline-result">
+          On 100 benchmark questions it never saw during tuning, it answers
+          <strong>49%</strong> correctly. Plain vector search manages <strong>15%</strong>.
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="#explorer">Explore all 100 answers</a>
+          <a class="btn" href="https://github.com/TejaGelli668/production-rag-with-evals">Read the source</a>
+        </div>
+      </div>
+
+      <figure class="exhibit" aria-label="One benchmark question answered two ways">
+        <p class="exhibit__q">How much has the effective tax rate of Corning changed between FY2021 and FY2022?</p>
+
+        <div class="exhibit__answer exhibit__answer--wrong">
+          <p class="exhibit__who"><span class="mark mark--wrong" aria-hidden="true">✕</span> Plain vector search</p>
+          <blockquote>&ldquo;The effective tax rate was 20.5% in FY2021 and 17.8% in FY2022.&rdquo;</blockquote>
+          <p class="exhibit__why">It read Corning&rsquo;s 2019&ndash;2021 annual reports and a 2023 quarterly, none of them the FY2022 filing.</p>
+        </div>
+
+        <div class="exhibit__answer exhibit__answer--right">
+          <p class="exhibit__who"><span class="mark mark--right" aria-hidden="true">✓</span> This system</p>
+          <blockquote>&ldquo;The effective tax rate was 20.2% in FY2021 and <span class="hl">22.9% in FY2022</span>.&rdquo;</blockquote>
+          <p class="exhibit__why">It narrowed the search to Corning&rsquo;s FY2022 10-K and cites pp. 77&ndash;78.</p>
+        </div>
+
+        <figcaption>Analyst&rsquo;s answer in FinanceBench: 20% in FY2021, 23% in FY2022.</figcaption>
+      </figure>
+    </section>
+
+    <section id="results" class="band" aria-labelledby="results-title">
+      <div class="wrap">
+        <h2 id="results-title">How it does on questions it never saw</h2>
+        <p class="section-lede">
+          FinanceBench&rsquo;s 150 questions were split once: 50 for building and tuning, 100 held back.
+          The held-back set was run a single time, after every decision was made.
+        </p>
+        <div class="results">
+          <picture class="results__chart">
+            <source media="(prefers-color-scheme: dark)" srcset="img/test_correct-dark.svg">
+            <img src="img/test_correct-light.svg" alt="Held-out accuracy: plain vector search 0.15, this system 0.49, with 95% confidence intervals" width="720" height="214">
+          </picture>
+          <table class="results__table">
+            <caption>Held-out test, 100 questions</caption>
+            <thead><tr><th scope="col"></th><th scope="col">Plain vector search</th><th scope="col">This system</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Answered correctly</th><td>15%</td><td><strong>49%</strong></td></tr>
+              <tr><th scope="row">Right filing among the 5 passages read</th><td>44%</td><td><strong>95%</strong></td></tr>
+              <tr><th scope="row">Right page among them</th><td>16%</td><td><strong>57%</strong></td></tr>
+              <tr><th scope="row">Answers fully supported by their sources</th><td>91%</td><td>93%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="fine">
+          The improvement is +34 points, with a 95% confidence interval of +24 to +44 (paired bootstrap over the same questions).
+          It also declined all 30 questions in a separate set built to be unanswerable, such as companies
+          outside the corpus and years with no filing yet.
+        </p>
+      </div>
+    </section>
+
+    <section id="explorer" class="wrap explorer" aria-labelledby="explorer-title">
+      <h2 id="explorer-title">Every held-out question, answered</h2>
+      <p class="section-lede">
+        These are the real outputs from the held-out run, not cherry-picked examples. Open any question to
+        compare both systems&rsquo; answers with the analyst&rsquo;s, see which pages each one read, and
+        see where the evidence actually was.
+      </p>
+
+      <div class="controls" role="group" aria-label="Filter questions">
+        <div class="seg" role="radiogroup" aria-label="Show">
+          <button type="button" role="radio" aria-checked="true" data-filter="all">All</button>
+          <button type="button" role="radio" aria-checked="false" data-filter="fixed">Fixed by this system</button>
+          <button type="button" role="radio" aria-checked="false" data-filter="failing">Still failing</button>
+          <button type="button" role="radio" aria-checked="false" data-filter="worse">Got worse</button>
+          <button type="button" role="radio" aria-checked="false" data-filter="unanswerable">Unanswerable set</button>
+        </div>
+        <label class="search">
+          <span class="visually-hidden">Search questions</span>
+          <input type="search" id="search" placeholder="Search by company or topic" autocomplete="off">
+        </label>
+      </div>
+      <p class="count" id="count" aria-live="polite"></p>
+      <ol class="qlist" id="qlist"></ol>
+      <p class="fine" id="data-note"></p>
+    </section>
+
+    <section id="experiments" class="band" aria-labelledby="exp-title">
+      <div class="wrap">
+        <h2 id="exp-title">What was tried, and what was kept</h2>
+        <p class="section-lede">
+          Each experiment changed one thing and was compared with the previous best on the same 50 tuning questions.
+          Changes that didn&rsquo;t clearly help were dropped, including some that sound like best practice.
+        </p>
+        <table class="exp">
+          <thead><tr><th scope="col">Change</th><th scope="col">What happened</th><th scope="col">Decision</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Filter by the company and fiscal year named in the question</th><td>Right page found: 20% → 38%. The largest single gain; most mistakes were the same company&rsquo;s other years.</td><td><span class="tag tag--kept">Kept</span></td></tr>
+            <tr><th scope="row">Rerank the top 50 passages with a cross-encoder</th><td>Together with the filter: right page found 54%</td><td><span class="tag tag--kept">Kept</span></td></tr>
+            <tr><th scope="row">Add keyword search (BM25) to vector search</th><td>Right filing found fell from 66% to 48%: filings share too much boilerplate wording</td><td><span class="tag">Dropped</span></td></tr>
+            <tr><th scope="row">Smaller or page-bounded chunks</th><td>Worse or no change</td><td><span class="tag">Dropped</span></td></tr>
+            <tr><th scope="row">Parse tables as markdown</th><td>No gain, even when the model was handed the right page</td><td><span class="tag">Dropped</span></td></tr>
+            <tr><th scope="row">Let the model rewrite the search query</th><td>+6 points at the top 5, within noise</td><td><span class="tag">Not adopted</span></td></tr>
+            <tr><th scope="row">Make the model list figures before answering</th><td>Fewer refusals, same accuracy: the extra answers were wrong</td><td><span class="tag">Not adopted</span></td></tr>
+          </tbody>
+        </table>
+        <picture class="exp__chart">
+          <source media="(prefers-color-scheme: dark)" srcset="img/retrieval_page_hit-dark.svg">
+          <img src="img/retrieval_page_hit-light.svg" alt="Share of tuning questions with the right page among the top 5 passages, by configuration" width="720" height="416" loading="lazy">
+        </picture>
+        <p class="fine"><a href="https://github.com/TejaGelli668/production-rag-with-evals/blob/main/docs/experiments.md">All experiments with confidence intervals</a> and the <a href="https://github.com/TejaGelli668/production-rag-with-evals/blob/main/docs/evaluation.md">evaluation methodology</a>.</p>
+      </div>
+    </section>
+
+    <section id="how" class="wrap how" aria-labelledby="how-title">
+      <h2 id="how-title">How an answer is made</h2>
+      <ol class="steps">
+        <li><h3>Read the question</h3><p>Rules pick out the company and fiscal year. They&rsquo;re right on 50 of 50 tuning questions for the company and 48 of 50 for the year.</p></li>
+        <li><h3>Search the right filings</h3><p>Vector search over 81,517 passages, restricted to that company and year, returns the 50 closest passages. If nothing matches, the filter loosens.</p></li>
+        <li><h3>Rerank</h3><p>A cross-encoder (bge-reranker-v2-m3) reads each passage against the question and keeps the best 5.</p></li>
+        <li><h3>Answer with citations</h3><p>A local model (Qwen3 14B via Ollama) answers only from those passages and cites them. When they don&rsquo;t contain the answer, it says so instead of guessing.</p></li>
+        <li><h3>Check it</h3><p>Every change is scored on 50 tuning questions. A gate on every push to GitHub re-checks retrieval quality, and fails the build if it drops.</p></li>
+      </ol>
+      <figure class="demo">
+        <img src="img/demo.gif" alt="The app answering a question about Netflix's FY2017 liabilities, showing the cited balance sheet page" width="800" height="500" loading="lazy">
+        <figcaption>The app running locally: a streamed answer, its sources, and the cited page of the filing. Runs entirely on a laptop, with no API keys.</figcaption>
+      </figure>
+    </section>
+
+    <section class="band" aria-labelledby="limits-title">
+      <div class="wrap limits">
+        <h2 id="limits-title">Where it falls short</h2>
+        <ul>
+          <li><strong>The model is now the weak link.</strong> Even when handed the exact right pages, it answers 54% of the tuning questions correctly, and 18 of its 51 held-out misses happened with the right evidence in front of it.</li>
+          <li><strong>It&rsquo;s cautious.</strong> It declines 26% of answerable questions, sometimes with the evidence already retrieved.</li>
+          <li><strong>It grades itself.</strong> The judge is the same local model as the answerer. The judge passed its sanity checks (98% or better on correctness), but a person hasn&rsquo;t yet graded its grades.</li>
+          <li><strong>Reranking costs time:</strong> about 6&ndash;7 seconds per question on a laptop.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>Built by <a href="https://github.com/TejaGelli668">Teja Gelli</a>. Source, data pipeline and evaluation code on <a href="https://github.com/TejaGelli668/production-rag-with-evals">GitHub</a>.</p>
+    <p>Questions and analyst answers from FinanceBench by Patronus AI (CC BY-NC 4.0). Filing excerpts are from public SEC filings.</p>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

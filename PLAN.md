@@ -286,6 +286,7 @@ Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra
 - [x] Eval gate, **retrieval-only** (no LLM): `ci_smoke` on a 51-filing CI corpus (gold filings plus neighbouring-year distractors), thresholds in `evals/gate.yaml`. Verified to fail when filters are disabled or chunks shrink to 250 tokens. Metrics on GitHub's Linux CPU match the local Mac GPU run exactly
 - [x] Built index cached between CI runs: the cold build is ~55 min on a 2-core runner, cached runs are ~2 min
 - [x] Demo: GIF of the UI in the README (local app, recorded from the browser)
+- [x] Project site on GitHub Pages (https://tejagelli668.github.io/production-rag-with-evals/): results, plus an explorer of all 100 held-out answers vs the baseline, exported from the real test run. The live app can't run on static hosting (it needs a Python server, Qdrant and a 14B model)
 - [ ] Human judge calibration (`rag label` + `rag calibrate`): needs a human
 - [x] Unanswerable set verified against the corpus by script (owner accepted this in place of a manual review)
 - [x] README: architecture diagram (Mermaid), results, kept/dropped experiments, limitations, how to run

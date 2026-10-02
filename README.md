@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/TejaGelli668/production-rag-with-evals/actions/workflows/ci.yml/badge.svg)](https://github.com/TejaGelli668/production-rag-with-evals/actions/workflows/ci.yml)
 
+**Project site: [tejagelli668.github.io/production-rag-with-evals](https://tejagelli668.github.io/production-rag-with-evals/)**, which has the results and an
+explorer of all 100 held-out answers, side by side with the baseline and the analyst's answer.
+
 Question answering over real SEC filings (10-K, 10-Q, 8-K) that cites the page it used,
 built and tuned through evaluation on the [FinanceBench](https://github.com/patronus-ai/financebench)
 benchmark. Every component was kept only if a measured experiment showed it helped, and
@@ -201,7 +204,8 @@ src/rag/           config, embeddings, vector store, query analysis, retrieval, 
 ui/                Streamlit app
 configs/           one YAML per experiment; final = stack_filter_rerank.yaml
 evals/             splits, custom cases, committed run summaries, judge reports, gate thresholds
-scripts/           download, splits, exploration, pre-parsing, charts
+scripts/           download, splits, exploration, pre-parsing, charts, site build
+site/              the static project site (GitHub Pages); data exported by scripts/export_site_data.py
 docs/              evaluation methodology, experiments, data exploration, charts
 tests/             unit tests (no network, no models)
 ```

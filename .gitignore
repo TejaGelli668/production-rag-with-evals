@@ -17,3 +17,4 @@ __pycache__/
 
 # Raw eval runs (traces can be large); summaries are committed under evals/results/
 /evals/runs/
+/_site/
