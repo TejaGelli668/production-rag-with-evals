@@ -33,7 +33,8 @@ jobs:
     name: Eval gate (retrieval, no LLM)
     needs: lint-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A cold index build takes ~1 h on a 2-core runner; with the index cache it is ~2 min.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0  # no moving major tag for v10
@@ -52,11 +53,18 @@ jobs:
         with:
           path: data/financebench
           key: financebench-ci-${{ hashFiles('src/rag/data/financebench.py', 'evals/splits/ci_smoke.json') }}
+      - name: Cache built index
+        # Rebuilt only when something that shapes the index changes. Retrieval code (filters,
+        # rerank, query analysis) is not in the key: the gate re-runs retrieval every time.
+        uses: actions/cache@v6
+        with:
+          path: storage
+          key: index-${{ hashFiles('configs/ci_gate.yaml', 'src/rag/ingest/**', 'src/rag/embed.py', 'src/rag/config.py', 'src/rag/schema.py', 'src/rag/store.py', 'src/rag/data/financebench.py', 'evals/splits/ci_smoke.json', 'uv.lock') }}
       - name: Download CI corpus (51 filings, checksum-verified)
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/download_financebench.py --mode ci
-      - name: Index
+      - name: Index (no-op on a cache hit; resumes a partial build)
         run: uv run rag ingest --config configs/ci_gate.yaml
       - name: Retrieval eval on ci_smoke
         run: uv run rag eval --config configs/ci_gate.yaml --split ci_smoke --retrieval-only

@@ -8,6 +8,8 @@ redone, because it never reached the manifest.
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -52,7 +54,7 @@ class Manifest:
 
 
 def ingest(
-    cfg: PipelineConfig, settings: Settings, limit: int | None = None, workers: int = 8
+    cfg: PipelineConfig, settings: Settings, limit: int | None = None, workers: int | None = None
 ) -> IngestStats:
     started = time.perf_counter()
     docs = select_documents(cfg.corpus, load_documents(), load_questions())[:limit]
@@ -69,7 +71,11 @@ def ingest(
     chunks_added = 0
     # Parsing runs in worker processes (cached on disk); embedding stays in this process.
     parse = partial(parse_cached, cfg.parser)
-    with ProcessPoolExecutor(max_workers=workers) as pool:
+    # `spawn`, not `fork`: the parent already runs PyTorch's thread pools, which a forked
+    # child would inherit in an undefined state. Never more workers than cores.
+    workers = workers or min(8, os.cpu_count() or 1)
+    context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
         parsed = pool.map(parse, [d.pdf_path for d in todo])
         for doc, pages in tqdm(
             zip(todo, parsed, strict=True),
