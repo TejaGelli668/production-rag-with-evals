@@ -8,7 +8,7 @@ from rag.config import PipelineConfig, Settings
 from rag.generate.citations import resolve_citations
 from rag.generate.llm import LLM, make_llm
 from rag.generate.prompts import CLOSED_BOOK_SYSTEM_PROMPT, SYSTEM_PROMPT, build_user_prompt
-from rag.retrieve import DenseRetriever, NoRetriever, OracleRetriever, Retriever
+from rag.retrieve import NoRetriever, OracleRetriever, Retriever, SearchRetriever
 from rag.schema import Answer
 from rag.store import Filters, QdrantStore, make_client
 
@@ -27,12 +27,27 @@ def make_retriever(cfg: PipelineConfig, settings: Settings) -> Retriever:
 
     from rag.embed import Embedder  # deferred: loads torch
 
-    store = QdrantStore(make_client(settings), cfg.collection_name)
+    store = QdrantStore(make_client(settings, cfg.collection_name), cfg.collection_name)
     if not store.exists():
         raise IndexNotFoundError(
             f"index '{cfg.collection_name}' not found; run `rag ingest` with this config first"
         )
-    return DenseRetriever(cfg.retriever, Embedder(cfg.embedder), store)
+    rc = cfg.retriever
+    analyzer = bm25 = reranker = None
+    if rc.filters != "none":
+        from rag.data.financebench import load_documents
+        from rag.query import QueryAnalyzer
+
+        analyzer = QueryAnalyzer(load_documents())
+    if rc.type == "hybrid":
+        from rag.sparse import BM25Index
+
+        bm25 = BM25Index.load_or_build(cfg.collection_name, store.all_chunks)
+    if rc.rerank:
+        from rag.rerank import Reranker
+
+        reranker = Reranker(rc.reranker_model)
+    return SearchRetriever(rc, Embedder(cfg.embedder), store, analyzer, bm25, reranker)
 
 
 class RAGPipeline:

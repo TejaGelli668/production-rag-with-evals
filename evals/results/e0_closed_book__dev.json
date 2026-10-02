@@ -1,0 +1,105 @@
+{
+  "run": "e0_closed_book__dev",
+  "config": "e0_closed_book",
+  "split": "dev",
+  "generator": "qwen3:14b",
+  "retriever": "none",
+  "judge": [
+    "qwen3:14b"
+  ],
+  "judge_is_generator": true,
+  "cases": 50,
+  "rows": 50,
+  "truncated": 0,
+  "unresolved_errors": 0,
+  "metrics": {
+    "correct": {
+      "mean": 0.22,
+      "ci95": [
+        0.12,
+        0.34
+      ],
+      "n": 50
+    },
+    "refused": {
+      "mean": 0.16,
+      "ci95": [
+        0.06,
+        0.26
+      ],
+      "n": 50
+    },
+    "numeric_match": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 13
+    }
+  },
+  "by_tag": {
+    "domain-relevant": {
+      "correct": {
+        "mean": 0.375,
+        "ci95": [
+          0.125,
+          0.625
+        ],
+        "n": 16
+      },
+      "refused": {
+        "mean": 0.125,
+        "ci95": [
+          0.0,
+          0.3125
+        ],
+        "n": 16
+      }
+    },
+    "metrics-generated": {
+      "correct": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.23529411764705882,
+        "ci95": [
+          0.058823529411764705,
+          0.47058823529411764
+        ],
+        "n": 17
+      }
+    },
+    "novel-generated": {
+      "correct": {
+        "mean": 0.29411764705882354,
+        "ci95": [
+          0.11764705882352941,
+          0.5294117647058824
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.11764705882352941,
+        "ci95": [
+          0.0,
+          0.29411764705882354
+        ],
+        "n": 17
+      }
+    }
+  },
+  "perf": {
+    "generation_latency_p50_s": 3.443,
+    "generation_latency_p95_s": 6.848,
+    "input_tokens_mean": 173.06,
+    "output_tokens_mean": 61.78,
+    "judge_input_tokens_mean": 376.9,
+    "retrieval_latency_p50_s": 0.0
+  }
+}

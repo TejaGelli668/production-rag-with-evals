@@ -52,16 +52,20 @@ class FixedTokenChunker:
             for start, end in offsets
         ]
 
-    def chunk(self, pages: list[Page], doc: Document, index_key: str) -> list[Chunk]:
-        tokens = self._tokens(pages)
-        chunks: list[Chunk] = []
+    def _windows(self, tokens: list[_Token]) -> list[list[_Token]]:
         step = self.size - self.overlap
+        windows = []
         for start in range(0, len(tokens), step):
-            window = tokens[start : start + self.size]
-            chunks.append(self._make_chunk(window, pages, doc, index_key, len(chunks)))
+            windows.append(tokens[start : start + self.size])
             if start + self.size >= len(tokens):
                 break
-        return chunks
+        return windows
+
+    def chunk(self, pages: list[Page], doc: Document, index_key: str) -> list[Chunk]:
+        return [
+            self._make_chunk(window, pages, doc, index_key, i)
+            for i, window in enumerate(self._windows(self._tokens(pages)))
+        ]
 
     def _make_chunk(
         self,
@@ -91,3 +95,26 @@ class FixedTokenChunker:
             fiscal_year=doc.doc_period,
             gics_sector=doc.gics_sector,
         )
+
+
+class PageBoundedChunker(FixedTokenChunker):
+    """Fixed-size windows that never cross a page boundary.
+
+    Every chunk belongs to exactly one page, so a table is never glued to the
+    next page's content, and short pages become single chunks.
+    """
+
+    def chunk(self, pages: list[Page], doc: Document, index_key: str) -> list[Chunk]:
+        tokens = self._tokens(pages)
+        by_page: dict[int, list[_Token]] = {}
+        for t in tokens:
+            by_page.setdefault(t.page_idx, []).append(t)
+        windows = [w for page_idx in sorted(by_page) for w in self._windows(by_page[page_idx])]
+        return [self._make_chunk(w, pages, doc, index_key, i) for i, w in enumerate(windows)]
+
+
+def make_chunker(
+    kind: str, tokenizer: PreTrainedTokenizerBase, size: int, overlap: int
+) -> FixedTokenChunker:
+    chunkers = {"fixed": FixedTokenChunker, "page": PageBoundedChunker}
+    return chunkers[kind](tokenizer, size, overlap)

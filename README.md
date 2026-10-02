@@ -4,7 +4,7 @@ Question answering over real SEC filings (10-K, 10-Q, 8-K), built and tuned thro
 the [FinanceBench](https://github.com/patronus-ai/financebench) benchmark. Every design choice is
 backed by a measured experiment.
 
-> 🚧 **Status: Phase 2 in progress**: the eval harness is built and the baseline is measured (14% correct on `dev`; it finds the right filing 92% of the time but the right page only 22%). See [PLAN.md](PLAN.md).
+> 🚧 **Status: Phase 3 in progress.** On the full 360-filing corpus, company and fiscal-year filters plus cross-encoder reranking raise page hit@5 from 0.20 to 0.54 ([experiments](docs/experiments.md)). See [PLAN.md](PLAN.md).
 
 ## Quickstart
 

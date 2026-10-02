@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 
 from tqdm import tqdm
 
 from rag.config import PipelineConfig, Settings
-from rag.data.financebench import load_documents, load_questions, select_documents
+from rag.data.financebench import Document, load_documents, load_questions, select_documents
 from rag.embed import Embedder
-from rag.ingest.chunk import FixedTokenChunker
-from rag.ingest.parse import PARSERS
+from rag.ingest.chunk import FixedTokenChunker, make_chunker
+from rag.ingest.parse import parse_cached
+from rag.schema import Page
 from rag.store import QdrantStore, make_client
 
 
@@ -48,26 +51,33 @@ class Manifest:
         tmp.replace(self.path)
 
 
-def ingest(cfg: PipelineConfig, settings: Settings, limit: int | None = None) -> IngestStats:
+def ingest(
+    cfg: PipelineConfig, settings: Settings, limit: int | None = None, workers: int = 8
+) -> IngestStats:
     started = time.perf_counter()
     docs = select_documents(cfg.corpus, load_documents(), load_questions())[:limit]
     manifest = Manifest(settings, cfg)
     todo = [d for d in docs if d.doc_name not in manifest.done]
 
     embedder = Embedder(cfg.embedder)
-    chunker = FixedTokenChunker(embedder.tokenizer, cfg.chunker.size, cfg.chunker.overlap)
-    parse = PARSERS[cfg.parser]
-    store = QdrantStore(make_client(settings), cfg.collection_name)
+    chunker = make_chunker(
+        cfg.chunker.type, embedder.tokenizer, cfg.chunker.size, cfg.chunker.overlap
+    )
+    store = QdrantStore(make_client(settings, cfg.collection_name), cfg.collection_name)
     store.ensure_collection(embedder.dim)
 
     chunks_added = 0
-    for doc in tqdm(todo, desc=f"ingest {cfg.collection_name}", unit="doc"):
-        chunks = chunker.chunk(parse(doc.pdf_path), doc, cfg.index_key)
-        store.delete_doc(doc.doc_name)  # clear any partial write from an interrupted run
-        if chunks:
-            store.upsert(chunks, embedder.embed_documents([c.text for c in chunks]))
-        manifest.mark_done(doc.doc_name, len(chunks))
-        chunks_added += len(chunks)
+    # Parsing runs in worker processes (cached on disk); embedding stays in this process.
+    parse = partial(parse_cached, cfg.parser)
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        parsed = pool.map(parse, [d.pdf_path for d in todo])
+        for doc, pages in tqdm(
+            zip(todo, parsed, strict=True),
+            total=len(todo),
+            desc=f"ingest {cfg.collection_name}",
+            unit="doc",
+        ):
+            chunks_added += _index_doc(doc, pages, chunker, embedder, store, manifest, cfg)
 
     return IngestStats(
         docs_total=len(docs),
@@ -76,3 +86,20 @@ def ingest(cfg: PipelineConfig, settings: Settings, limit: int | None = None) ->
         chunks_added=chunks_added,
         seconds=time.perf_counter() - started,
     )
+
+
+def _index_doc(
+    doc: Document,
+    pages: list[Page],
+    chunker: FixedTokenChunker,
+    embedder: Embedder,
+    store: QdrantStore,
+    manifest: Manifest,
+    cfg: PipelineConfig,
+) -> int:
+    chunks = chunker.chunk(pages, doc, cfg.index_key)
+    store.delete_doc(doc.doc_name)  # clear any partial write from an interrupted run
+    if chunks:
+        store.upsert(chunks, embedder.embed_documents([c.text for c in chunks]))
+    manifest.mark_done(doc.doc_name, len(chunks))
+    return len(chunks)

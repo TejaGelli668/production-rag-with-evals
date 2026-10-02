@@ -1,0 +1,9 @@
+# E5: filter to the company named in the question. Same index as e1_full.
+name: e5_company
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, filters: company}

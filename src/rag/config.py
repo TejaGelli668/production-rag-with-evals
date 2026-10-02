@@ -35,7 +35,8 @@ class Settings(BaseSettings):
 
 
 class ChunkerConfig(BaseModel):
-    type: Literal["fixed"] = "fixed"
+    # fixed: windows over the whole document (may span pages); page: never cross a page
+    type: Literal["fixed", "page"] = "fixed"
     size: int = Field(500, gt=0, description="tokens per chunk (embedder tokenizer)")
     overlap: int = Field(50, ge=0)
 
@@ -48,9 +49,18 @@ class EmbedderConfig(BaseModel):
 
 
 class RetrieverConfig(BaseModel):
+    # dense: vectors only; hybrid: dense + BM25 fused with RRF (E4).
     # `oracle` and `none` are evaluation bounds (E0): the gold evidence pages, or no context.
-    type: Literal["dense", "oracle", "none"] = "dense"
+    type: Literal["dense", "hybrid", "oracle", "none"] = "dense"
     top_k: int = 5
+    # Metadata filters inferred from the question (E5), relaxed when nothing matches.
+    filters: Literal["none", "company", "company_year"] = "none"
+    # Pool size gathered before fusion or reranking.
+    candidates: int = 50
+    rrf_k: int = 60
+    # Cross-encoder reranking of the candidate pool (E6).
+    rerank: bool = False
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
 
 class GeneratorConfig(BaseModel):
@@ -78,7 +88,7 @@ class JudgeConfig(GeneratorConfig):
 class PipelineConfig(BaseModel):
     name: str
     corpus: CorpusMode = CorpusMode.FOCUSED
-    parser: Literal["pymupdf"] = "pymupdf"
+    parser: Literal["pymupdf", "pymupdf4llm"] = "pymupdf"
     chunker: ChunkerConfig = ChunkerConfig()
     embedder: EmbedderConfig = EmbedderConfig()
     retriever: RetrieverConfig = RetrieverConfig()

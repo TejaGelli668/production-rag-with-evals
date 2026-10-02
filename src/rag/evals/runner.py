@@ -37,7 +37,7 @@ from rag.evals.summary import summarize, write_summary
 from rag.generate.llm import LLMError, make_llm
 from rag.generate.prompts import format_source
 from rag.pipeline import RAGPipeline, make_retriever
-from rag.retrieve import DenseRetriever
+from rag.retrieve import SearchRetriever
 from rag.schema import Answer, LLMResponse
 
 RUNS_DIR = PROJECT_ROOT / "evals" / "runs"
@@ -147,7 +147,7 @@ def run_eval(
     run_dir = RUNS_DIR / f"{cfg.name}__{split}"
     meta = {
         "config": cfg.model_dump(mode="json"),
-        "collection": cfg.collection_name if cfg.retriever.type == "dense" else None,
+        "collection": cfg.collection_name if cfg.retriever.type in ("dense", "hybrid") else None,
         "split": split,
         "judge": judge_cfg.model_dump(mode="json") if use_judges else None,
         "judge_is_generator": use_judges and judge_cfg.model == cfg.generator.model,
@@ -170,7 +170,9 @@ def run_eval(
                 answer,
                 judges,
                 pipeline.closed_book,
-                retrieval_k=cfg.retriever.top_k if cfg.retriever.type == "dense" else None,
+                retrieval_k=cfg.retriever.top_k
+                if cfg.retriever.type in ("dense", "hybrid")
+                else None,
             )
         except (LLMError, JudgeError, httpx.HTTPError) as e:
             _append(
@@ -237,7 +239,7 @@ def run_retrieval_eval(
     """Retrieval metrics at several k with no LLM calls: fast and free, for Phase 3 sweeps."""
     settings = settings or Settings()
     retriever = make_retriever(cfg, settings)
-    if not isinstance(retriever, DenseRetriever):
+    if not isinstance(retriever, SearchRetriever):
         raise ValueError("retrieval-only evaluation needs a dense retriever")
     cases = [c for c in load_cases(split)[:limit] if c.answerable]
     run_dir = RUNS_DIR / f"{cfg.name}__{split}__retrieval"

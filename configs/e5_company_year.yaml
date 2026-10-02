@@ -1,0 +1,9 @@
+# E5: filter to the company and fiscal year named in the question (relaxed if nothing matches).
+name: e5_company_year
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, filters: company_year}

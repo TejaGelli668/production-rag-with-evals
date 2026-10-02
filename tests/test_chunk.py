@@ -74,3 +74,13 @@ def test_chunk_ids_are_deterministic_and_scoped_by_index():
 def test_rejects_overlap_not_smaller_than_size():
     with pytest.raises(ValueError):
         FixedTokenChunker(WhitespaceTokenizer(), size=5, overlap=5)
+
+
+def test_page_bounded_chunks_never_cross_pages():
+    from rag.ingest.chunk import PageBoundedChunker
+
+    pages = [Page(page_num=0, text=words("a", 7)), Page(page_num=1, text=words("b", 3))]
+    chunks = PageBoundedChunker(WhitespaceTokenizer(), size=5, overlap=1).chunk(pages, DOC, "k")
+    assert [(c.page_start, c.page_end) for c in chunks] == [(0, 0), (0, 0), (1, 1)]
+    assert [c.text for c in chunks] == ["a0 a1 a2 a3 a4", "a4 a5 a6", "b0 b1 b2"]
+    assert [c.chunk_index for c in chunks] == [0, 1, 2]

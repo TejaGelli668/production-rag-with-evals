@@ -242,7 +242,9 @@ Notes from Phase 1 (first answers from the baseline, not measured yet):
 - [ ] **Hand-label ~60 answers** (needs a human) and calibrate the judge
 - [x] Drafted the `unanswerable` set (30 cases in 4 categories). **Needs human review**
 - [x] E1 baseline on `dev`: 14% correct, 67% refused, Doc Hit@5 92%, Page Hit@5 22% (see `evals/results/baseline__dev.json`)
-- [ ] E0 bounds (oracle, closed-book), retrieval sweep, full judge checks: running
+- [x] E0 bounds on `dev`: closed-book 22% correct, oracle 54%, baseline 14%. Retrieval costs ~41 points; the local generator caps out near 54%
+- [x] Retrieval sweep (k=1..20) for the baseline
+- [ ] Full judge sanity checks on `dev`: deferred (memory pressure); re-run with `rag check-judge`
 - **Done when:** one command produces a full metrics report for any config
 
 Notes from Phase 2 so far:
@@ -250,11 +252,19 @@ Notes from Phase 2 so far:
 - Spot check of all 16 judged baseline answers: the correctness verdicts looked right. The faithfulness judge missed an arithmetic error (`financebench_id_04254`: 1,263 + 636 reported as 2,100).
 - One baseline case hit a 600 s Ollama timeout. It was logged as an infra error, not a wrong answer, and a re-run retries it.
 
-### Phase 3: Experiments (~2–3 days)
-- [ ] Run E2–E9 on `dev` in `full` mode, one change at a time
-- [ ] Error analysis on the best config
-- [ ] Final run on `test`; produce charts for the README
+### Phase 3: Experiments (~2–3 days) 🚧 in progress
+- [x] `full` corpus indexed (360 filings, 81,517 chunks); `e1_full` is the Phase 3 baseline
+- [x] E5 metadata filters (rule-based company and fiscal-year extraction with relaxation): page hit@5 0.20 → 0.38\*
+- [x] E6 cross-encoder rerank of top-50: 0.20 → 0.28 alone, **0.54\* with filters**
+- [x] E4 BM25 hybrid: hurts alone (doc hit 0.66 → 0.48\*) and adds nothing on top of filters, so dropped
+- [x] E3 markdown tables (pymupdf4llm, `focused`): no retrieval gain; generator effect pending a judged run
+- [ ] E2 chunking (page-bounded, 250-token): indexes building
+- [ ] Judged end-to-end runs: `stack_filter_rerank`, `e1_full`, `e3_md_focused` (running)
+- [ ] E7 query rewriting, E8 prompting, E9 embedding swap
+- [ ] Error analysis on the best config; final run on `test`; charts for the README
 - **Done when:** the results table shows a measured gain for each component that was kept
+
+Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra changes: one embedded Qdrant folder per collection (embedded Qdrant allows one process per folder); an on-disk parse cache with parallel pre-parsing (`scripts/preparse.py`).
 
 ### Phase 4: Service, UI and observability (~1–2 days)
 - [ ] FastAPI: `/ask` (streaming), `/health`, `/feedback`

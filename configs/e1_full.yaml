@@ -1,0 +1,14 @@
+# E1 on the full corpus (360 filings): the baseline every Phase 3 experiment is compared with.
+name: e1_full
+corpus: full
+parser: pymupdf
+chunker:
+  type: fixed
+  size: 500
+  overlap: 50
+retriever:
+  type: dense
+  top_k: 5
+generator:
+  provider: ollama
+  model: qwen3:14b

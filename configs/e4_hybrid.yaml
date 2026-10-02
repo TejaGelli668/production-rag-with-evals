@@ -1,0 +1,9 @@
+# E4: dense + BM25, fused with reciprocal rank fusion. Same index as e1_full.
+name: e4_hybrid
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: hybrid, top_k: 5, candidates: 50}

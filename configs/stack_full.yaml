@@ -1,0 +1,10 @@
+# Stack: company+year filters, hybrid (dense + BM25), cross-encoder rerank of top-50.
+# Same index as e1_full; combines E4, E5 and E6.
+name: stack_full
+corpus: full
+parser: pymupdf
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: hybrid, top_k: 5, filters: company_year, candidates: 50, rerank: true}
+generator:
+  provider: ollama
+  model: qwen3:14b

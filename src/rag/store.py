@@ -10,15 +10,22 @@ from qdrant_client import QdrantClient, models
 from rag.config import Settings
 from rag.schema import Chunk, RetrievedChunk
 
-# Equality filters callers may pass to `search`, e.g. {"company": "3M", "fiscal_year": 2018}.
-Filters = dict[str, str | int]
+# Metadata filters for `search`: a value matches exactly, a list matches any of its items.
+# e.g. {"company": ["3M"], "fiscal_year": 2018}
+Filters = dict[str, str | int | list[str] | list[int]]
 
 
-def make_client(settings: Settings) -> QdrantClient:
+def make_client(settings: Settings, collection: str) -> QdrantClient:
+    """A server client if QDRANT_URL is set, else embedded storage for this one collection.
+
+    Embedded Qdrant lets only one process open a storage folder, so each collection
+    gets its own folder: different indexes can then be used concurrently.
+    """
     if settings.qdrant_url:
         return QdrantClient(url=settings.qdrant_url)
-    settings.qdrant_path.mkdir(parents=True, exist_ok=True)
-    return QdrantClient(path=str(settings.qdrant_path))
+    path = settings.qdrant_path / collection
+    path.mkdir(parents=True, exist_ok=True)
+    return QdrantClient(path=str(path))
 
 
 def _to_filter(filters: Filters | None) -> models.Filter | None:
@@ -26,7 +33,10 @@ def _to_filter(filters: Filters | None) -> models.Filter | None:
         return None
     return models.Filter(
         must=[
-            models.FieldCondition(key=k, match=models.MatchValue(value=v))
+            models.FieldCondition(
+                key=k,
+                match=models.MatchAny(any=v) if isinstance(v, list) else models.MatchValue(value=v),
+            )
             for k, v in filters.items()
         ]
     )
@@ -66,6 +76,17 @@ class QdrantStore:
                     for c, v in zip(batch, vectors[i : i + batch_size], strict=True)
                 ],
             )
+
+    def all_chunks(self, batch: int = 2048) -> list[Chunk]:
+        """Every chunk in the collection (used to build the BM25 index)."""
+        chunks, offset = [], None
+        while True:
+            points, offset = self.client.scroll(
+                self.collection, limit=batch, offset=offset, with_payload=True, with_vectors=False
+            )
+            chunks += [Chunk.model_validate(p.payload) for p in points]
+            if offset is None:
+                return chunks
 
     def search(
         self, vector: np.ndarray, top_k: int, filters: Filters | None = None

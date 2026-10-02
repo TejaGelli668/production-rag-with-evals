@@ -1,0 +1,9 @@
+# E6: rerank the top-50 dense candidates with a cross-encoder. Same index as e1_full.
+name: e6_rerank
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, candidates: 50, rerank: true}

@@ -1,0 +1,9 @@
+# E2: page-bounded chunks (never cross a page) instead of document-wide windows.
+name: e2_page
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: page, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5}

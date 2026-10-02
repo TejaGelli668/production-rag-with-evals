@@ -5,10 +5,12 @@ description = "Production RAG over SEC filings, built and tuned through evaluati
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "anthropic>=1.11.0",
+    "bm25s>=0.3.11",
     "httpx>=0.27",
     "pydantic>=2.8",
     "pydantic-settings>=2.15.0",
     "pymupdf>=1.24",
+    "pymupdf4llm>=1.28.2",
     "pyyaml>=6.0.3",
     "qdrant-client>=1.19.1",
     "sentence-transformers>=6.1.0",

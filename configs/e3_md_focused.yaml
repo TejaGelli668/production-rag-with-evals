@@ -1,0 +1,10 @@
+# E3: table-aware markdown parsing (pymupdf4llm) instead of plain PyMuPDF text.
+# Run on the focused corpus (parsing the full corpus takes ~3 h of CPU); compare with `baseline`.
+name: e3_md_focused
+corpus: focused
+parser: pymupdf4llm
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5}
+generator:
+  provider: ollama
+  model: qwen3:14b

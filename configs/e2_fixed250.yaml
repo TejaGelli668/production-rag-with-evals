@@ -1,0 +1,9 @@
+# E2: smaller fixed chunks (250 tokens) for more precise matches.
+name: e2_fixed250
+corpus: full
+parser: pymupdf
+generator:
+  provider: ollama
+  model: qwen3:14b
+chunker: {type: fixed, size: 250, overlap: 25}
+retriever: {type: dense, top_k: 5}
