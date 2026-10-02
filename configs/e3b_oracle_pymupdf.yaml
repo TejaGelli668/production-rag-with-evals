@@ -1,0 +1,8 @@
+# E3b: oracle (gold pages given) with page text from our PyMuPDF parser.
+# Paired with e3b_oracle_md: same pages, only the table format differs.
+name: e3b_oracle_pymupdf
+parser: pymupdf
+retriever: {type: oracle, oracle_text: parsed}
+generator:
+  provider: ollama
+  model: qwen3:14b

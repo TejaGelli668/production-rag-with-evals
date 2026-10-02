@@ -52,6 +52,8 @@ class RetrieverConfig(BaseModel):
     # dense: vectors only; hybrid: dense + BM25 fused with RRF (E4).
     # `oracle` and `none` are evaluation bounds (E0): the gold evidence pages, or no context.
     type: Literal["dense", "hybrid", "oracle", "none"] = "dense"
+    # Oracle only: gold-page text from FinanceBench's own extraction, or from `parser` (E3b).
+    oracle_text: Literal["financebench", "parsed"] = "financebench"
     top_k: int = 5
     # Metadata filters inferred from the question (E5), relaxed when nothing matches.
     filters: Literal["none", "company", "company_year"] = "none"

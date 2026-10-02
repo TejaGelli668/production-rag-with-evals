@@ -8,6 +8,7 @@ pages, or no context at all.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
 
 from rag.config import RetrieverConfig
@@ -100,12 +101,24 @@ class NoRetriever:
 class OracleRetriever:
     """Returns the gold evidence pages for a known FinanceBench question."""
 
-    def __init__(self, questions: list[Question], documents: list[Document]):
+    def __init__(
+        self,
+        questions: list[Question],
+        documents: list[Document],
+        page_text: Callable[[Document, int], str] | None = None,
+    ):
+        """`page_text`, if given, supplies each gold page's text from our own parser
+        (E3b) instead of FinanceBench's extraction."""
         docs = {d.doc_name: d for d in documents}
         self._by_question: dict[str, list[RetrievedChunk]] = {}
         for q in questions:
             pages = {
-                (e.doc_name, e.evidence_page_num): e.evidence_text_full_page for e in q.evidence
+                (e.doc_name, e.evidence_page_num): (
+                    page_text(docs[e.doc_name], e.evidence_page_num)
+                    if page_text
+                    else e.evidence_text_full_page
+                )
+                for e in q.evidence
             }
             self._by_question[q.question] = [
                 RetrievedChunk(chunk=page_chunk(docs[doc_name], page, text), score=1.0, rank=rank)

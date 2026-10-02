@@ -82,12 +82,116 @@ model), roughly 3 CPU-hours for the full corpus, so E3 was run on `focused` firs
 | `e3_md_focused` (markdown) | 0.90 | 0.20 | 0.55 | 0.13 |
 
 Markdown parsing does **not** improve retrieval (all differences within noise). Its expected
-benefit is that the generator can read tables, which is measured by the judged runs below.
+benefit is that the generator can read tables. The judged run can't show that either:
+
+| Config (judged, focused) | Correct | Refused |
+|---|---|---|
+| `baseline` | 14% | 67% |
+| `e3_md_focused` | 16% (Δ +0.02 [−0.06, +0.12]) | 62% |
+
+That isn't a fair test, because with plain dense retrieval 60% of questions never see the
+right page, so the parser rarely gets a chance to matter.
+
+**E3b isolates the parser** by giving the generator the gold pages, as the oracle does, but
+with page text from our own parsers instead of FinanceBench's extraction:
+`e3b_oracle_pymupdf` vs `e3b_oracle_md`. The pages and questions are identical; only the
+table format differs. _Results pending._
 
 ## E2: chunking (full corpus)
 
-_Pending: indexes are building._
+| Config | Chunks | Doc hit@5 | Page hit@5 | Evidence cov.@5 | Page hit@20 |
+|---|---|---|---|---|---|
+| `e1_full`: 500-token windows (may cross pages) | 81,517 | 0.66 | 0.20 | 0.55 | 0.32 |
+| `e2_page`: 500-token windows within a page | 103,211 | 0.52 (−0.14) | 0.22 (+0.02) | 0.52 (−0.02) | 0.42 (+0.10) |
+| `e2_fixed250`: 250-token windows | 162,911 | **0.46\*** (−0.20) | 0.14 (−0.06) | **0.45\*** (−0.10) | 0.34 (+0.02) |
 
-## Judged end-to-end runs
+On top of the kept stack (filters + rerank), page-bounded chunks change nothing measurable:
 
-_Pending._
+| Config | Doc hit@5 | Page hit@5 | Evidence cov.@5 | MRR@5 | Page hit@20 |
+|---|---|---|---|---|---|
+| `stack_filter_rerank` (500-token windows) | 0.98 | 0.54 | 0.69 | 0.37 | 0.72 |
+| `stack_page_filter_rerank` (page-bounded) | 0.96 (−0.02) | 0.52 (−0.02) | 0.72 (+0.03) | 0.38 (+0.01) | 0.72 (0.00) |
+
+**Findings**
+
+- **Smaller chunks hurt.** 250-token chunks double the index size and lose evidence coverage
+  significantly: a table split into smaller pieces leaves less of it in any one chunk.
+- **Page-bounded chunks don't help.** The Phase 1 failure (a cash-flow table split across
+  two chunks) motivated E2, but forbidding cross-page windows doesn't fix within-page splits,
+  and it creates many short end-of-page fragments (+27% chunks) that crowd the top 5.
+- **Decision: keep 500-token windows.** With filters and reranking, chunking makes no
+  measurable difference, and the original chunker produces the smallest index.
+
+## E7: query rewriting (full corpus, retrieval-only)
+
+The local LLM writes up to three keyword-style search queries, roughly one per line item the
+question needs. Results for each query are retrieved under the original question's filters,
+fused with RRF, and reranked against the original question.
+
+| Config | Page hit@5 | Page recall@5 | MRR@5 | Page hit@10 | Page hit@20 |
+|---|---|---|---|---|---|
+| `stack_filter_rerank` | 0.54 | 0.51 | 0.37 | 0.66 | 0.72 |
+| `e7_rewrite` | 0.60 (+0.06 [0.00, +0.14]) | 0.55 (+0.04) | 0.40 (+0.03) | 0.72 (+0.06) | **0.82 (+0.10\*)** |
+
+- **Rewriting widens what's found:** page hit@20 improves significantly. The top-5 gain sits
+  at the edge of noise (CI lower bound 0.00).
+- **It didn't help the questions it targeted:** for the 11 `dev` questions whose evidence
+  spans several pages, page recall@5 is unchanged (0.59 → 0.59). The gain came from
+  single-page questions (0.49 → 0.54).
+- **Decision: not adopted.** It adds an LLM call to every query for a top-5 gain that n = 50
+  can't distinguish from zero. It's worth revisiting if the generator ever gets a larger
+  context (top-10 or more), where the gain is clearer.
+
+## Judged end-to-end runs (full corpus)
+
+Generator and judge are both `qwen3:14b`, run locally. See the caveat in
+[evaluation.md](evaluation.md#known-limitations).
+
+| Config | Correct | Refused | Faithfulness (answered) | Cites a gold page (answered) |
+|---|---|---|---|---|
+| `e0_closed_book` | 22% | 16% | — | — |
+| `e1_full` (dense) | 12% | 68% | 1.00 (n=16) | 0.38 |
+| **`stack_filter_rerank`** | **40%** | 42% | 0.98 (n=29) | 0.52 |
+| `e0_oracle` | 54% | 14% | 0.97 | 1.00 |
+
+- **Accuracy goes from 12% to 40%:** Δ +0.28 [+0.16, +0.40]\* paired on the same 50
+  questions. Refusals fall from 68% to 42% because the right page is now in the context.
+- **About two-thirds of the retrieval gap is closed:** 28 of the 42 points between
+  `e1_full` and the oracle.
+- **Answers stay grounded:** 93% of answered questions are fully supported by the sources,
+  so the extra answers are not bought with hallucination.
+
+**Where the remaining errors are** (`rag analyze`):
+
+| Stage | `e1_full` | `stack_filter_rerank` |
+|---|---|---|
+| wrong filing | 16 | **1** |
+| wrong page (right filing) | 22 | 19 |
+| evidence missing (gold page, partial evidence) | 0 | 2 |
+| refused although evidence was retrieved | 3 | 6 |
+| wrong although evidence was retrieved | 3 | 2 |
+| correct | 6 | **20** |
+
+The filter fixed "wrong filing" almost completely. **Finding the right page inside the right
+filing is now the main failure** (19 of 30), followed by over-cautious refusals (6).
+
+### E8: stepwise answer format
+
+The model must list each figure with its source, then show the calculation, then answer.
+This targets the 8 generation failures: refusals despite retrieved evidence, and arithmetic slips.
+
+| Config (judged, full) | Correct | Refused | Fully faithful | Refused w/ evidence | Wrong w/ evidence |
+|---|---|---|---|---|---|
+| `stack_filter_rerank` | 40% | 42% | 93% | 6 | 2 |
+| `e8_stepwise` | 40% (Δ 0.00 [−0.10, +0.08]) | **28% (Δ −0.14\*)** | 81% | 1 | **7** |
+
+- **It turned refusals into wrong answers, not right ones.** Five questions moved from
+  "refused although evidence was retrieved" to "answered wrongly although evidence was
+  retrieved"; accuracy did not move, and faithfulness fell.
+- **Decision: not adopted.** For financial questions a confident wrong figure is worse than
+  "insufficient information", so the default prompt's more cautious behaviour wins at equal
+  accuracy. Refusal rate alone would have been a misleading target here.
+
+**Cost:** median generation latency 10.4 s → 15.9 s (longer context and answers), and
+median retrieval latency 0.3 s → 6.7 s because of reranking (measured on a GPU shared with
+the local LLM).

@@ -252,18 +252,20 @@ Notes from Phase 2 so far:
 - Spot check of all 16 judged baseline answers: the correctness verdicts looked right. The faithfulness judge missed an arithmetic error (`financebench_id_04254`: 1,263 + 636 reported as 2,100).
 - One baseline case hit a 600 s Ollama timeout. It was logged as an infra error, not a wrong answer, and a re-run retries it.
 
-### Phase 3: Experiments (~2–3 days) 🚧 in progress
+### Phase 3: Experiments (~2–3 days) 🚧 finishing
 - [x] `full` corpus indexed (360 filings, 81,517 chunks); `e1_full` is the Phase 3 baseline
-- [x] E5 metadata filters (rule-based company and fiscal-year extraction with relaxation): page hit@5 0.20 → 0.38\*
-- [x] E6 cross-encoder rerank of top-50: 0.20 → 0.28 alone, **0.54\* with filters**
-- [x] E4 BM25 hybrid: hurts alone (doc hit 0.66 → 0.48\*) and adds nothing on top of filters, so dropped
-- [x] E3 markdown tables (pymupdf4llm, `focused`): no retrieval gain; generator effect pending a judged run
-- [ ] E2 chunking (page-bounded, 250-token): indexes building
-- [ ] Judged end-to-end runs: `stack_filter_rerank`, `e1_full`, `e3_md_focused` (running)
-- [x] E7 query rewriting (`src/rag/rewrite.py`) and E8 stepwise prompt implemented; runs queued after the judged runs
+- [x] E2 chunking: 250-token chunks hurt (doc hit −0.20\*); page-bounded chunks change nothing, alone or stacked. **Keep 500-token windows**
+- [x] E3 markdown tables (pymupdf4llm): no retrieval gain; judged on `focused` 16% vs 14% (n.s.). **E3b** (gold pages from each parser) is running to isolate the generator effect
+- [x] E4 BM25 hybrid: hurts alone (doc hit −0.18\*), adds nothing with filters. **Dropped**
+- [x] E5 company + fiscal-year filters: page hit@5 0.20 → 0.38\*. **Kept**
+- [x] E6 cross-encoder rerank of top-50: with filters, page hit@5 → 0.54\*. **Kept**
+- [x] E7 LLM query rewriting: page hit@5 +0.06 (CI touches 0), page hit@20 +0.10\*; no gain on multi-page questions. **Not adopted** (extra LLM call per query)
+- [x] E8 stepwise prompt: refusals −14 pts\* but accuracy unchanged; the extra answers were wrong. **Not adopted**
 - [ ] E9 embedding swap (bge-m3): deferred, since re-indexing 360 filings takes ~2 h locally
-- [x] `rag analyze <run>` attributes each failure to a pipeline stage (focused baseline: 34 of 42 failures are retrieval, mostly wrong page)
-- [ ] Error analysis on the best config; final run on `test`; charts for the README
+- [x] **Judged on `dev`: `e1_full` 12% → `stack_filter_rerank` 40% correct (Δ +0.28 [+0.16, +0.40]\*)**; oracle ceiling 54%
+- [x] Error analysis (`rag analyze`): wrong-filing errors 16 → 1; the remaining failures are mostly wrong page in the right filing (19/30)
+- [x] README charts (`scripts/make_charts.py`, light/dark SVG)
+- [ ] **Final config = `stack_filter_rerank`.** One-time run on `test` (100 questions), with `e1_full` as a paired baseline: queued
 - **Done when:** the results table shows a measured gain for each component that was kept
 
 Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra changes: one embedded Qdrant folder per collection (embedded Qdrant allows one process per folder); an on-disk parse cache with parallel pre-parsing (`scripts/preparse.py`).

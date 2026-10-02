@@ -1,0 +1,145 @@
+{
+  "run": "e3b_oracle_pymupdf__dev",
+  "config": "e3b_oracle_pymupdf",
+  "split": "dev",
+  "generator": "qwen3:14b",
+  "retriever": "oracle",
+  "judge": [
+    "qwen3:14b"
+  ],
+  "judge_is_generator": true,
+  "cases": 50,
+  "rows": 50,
+  "truncated": 0,
+  "unresolved_errors": 0,
+  "metrics": {
+    "correct": {
+      "mean": 0.52,
+      "ci95": [
+        0.38,
+        0.66
+      ],
+      "n": 50
+    },
+    "refused": {
+      "mean": 0.1,
+      "ci95": [
+        0.02,
+        0.2
+      ],
+      "n": 50
+    },
+    "faithfulness": {
+      "mean": 0.9487654320987654,
+      "ci95": [
+        0.8864197530864197,
+        1.0
+      ],
+      "n": 45
+    },
+    "fully_faithful": {
+      "mean": 0.9333333333333333,
+      "ci95": [
+        0.8666666666666667,
+        1.0
+      ],
+      "n": 45
+    },
+    "numeric_match": {
+      "mean": 0.7647058823529411,
+      "ci95": [
+        0.5294117647058824,
+        0.9411764705882353
+      ],
+      "n": 17
+    },
+    "cites_gold_page": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 45
+    },
+    "has_citation": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 45
+    },
+    "invalid_citations": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 45
+    }
+  },
+  "by_tag": {
+    "domain-relevant": {
+      "correct": {
+        "mean": 0.375,
+        "ci95": [
+          0.1875,
+          0.625
+        ],
+        "n": 16
+      },
+      "refused": {
+        "mean": 0.1875,
+        "ci95": [
+          0.0,
+          0.375
+        ],
+        "n": 16
+      }
+    },
+    "metrics-generated": {
+      "correct": {
+        "mean": 0.5882352941176471,
+        "ci95": [
+          0.35294117647058826,
+          0.8235294117647058
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n": 17
+      }
+    },
+    "novel-generated": {
+      "correct": {
+        "mean": 0.5882352941176471,
+        "ci95": [
+          0.35294117647058826,
+          0.8235294117647058
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.11764705882352941,
+        "ci95": [
+          0.0,
+          0.29411764705882354
+        ],
+        "n": 17
+      }
+    }
+  },
+  "perf": {
+    "generation_latency_p50_s": 4.828,
+    "generation_latency_p95_s": 18.058,
+    "input_tokens_mean": 1384.82,
+    "output_tokens_mean": 96.64,
+    "judge_input_tokens_mean": 1779.9,
+    "retrieval_latency_p50_s": 0.0
+  }
+}

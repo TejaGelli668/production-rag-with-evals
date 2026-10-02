@@ -28,7 +28,20 @@ def make_retriever(cfg: PipelineConfig, settings: Settings) -> Retriever:
     if cfg.retriever.type == "oracle":
         from rag.data.financebench import load_documents, load_questions
 
-        return OracleRetriever(load_questions(), load_documents())
+        page_text = None
+        if cfg.retriever.oracle_text == "parsed":
+            from functools import cache
+
+            from rag.ingest.parse import parse_cached
+
+            @cache
+            def pages_of(doc_name: str, pdf_path):
+                return parse_cached(cfg.parser, pdf_path)
+
+            def page_text(doc, page: int) -> str:
+                return pages_of(doc.doc_name, doc.pdf_path)[page].text
+
+        return OracleRetriever(load_questions(), load_documents(), page_text)
 
     from rag.embed import Embedder  # deferred: loads torch
 

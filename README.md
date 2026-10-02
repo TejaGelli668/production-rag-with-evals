@@ -4,7 +4,32 @@ Question answering over real SEC filings (10-K, 10-Q, 8-K), built and tuned thro
 the [FinanceBench](https://github.com/patronus-ai/financebench) benchmark. Every design choice is
 backed by a measured experiment.
 
-> 🚧 **Status: Phase 3 in progress.** On the full 360-filing corpus, company and fiscal-year filters plus cross-encoder reranking raise page hit@5 from 0.20 to 0.54 ([experiments](docs/experiments.md)). See [PLAN.md](PLAN.md).
+> 🚧 **Status: Phase 3 in progress** (experiments). See [PLAN.md](PLAN.md).
+
+## Results so far
+
+On the full 360-filing corpus, metadata filters plus cross-encoder reranking take answer
+accuracy on FinanceBench `dev` from **12% to 40%** (paired Δ +28 points, 95% CI [+16, +40]),
+closing two-thirds of the gap to the oracle that is handed the gold pages. Answers stay
+grounded: 93% are fully supported by their sources.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/end_to_end_correct-dark.svg">
+  <img alt="Answer accuracy on dev: closed-book 0.22, E1 baseline 0.12, filter + rerank 0.40, oracle 0.54" src="docs/img/end_to_end_correct-light.svg">
+</picture>
+
+Each component was kept only if it measurably helped. Company + fiscal-year filtering was
+the largest single win; BM25 hybrid search and smaller or page-bounded chunks were tested
+and dropped.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/retrieval_page_hit-dark.svg">
+  <img alt="Page hit@5 by retrieval configuration; filter + rerank reaches 0.54 vs 0.20 for the dense baseline" src="docs/img/retrieval_page_hit-light.svg">
+</picture>
+
+Full tables, paired significance tests and error analysis are in
+[docs/experiments.md](docs/experiments.md). Caveat: generator and judge are currently the
+same local model (`qwen3:14b`); see [docs/evaluation.md](docs/evaluation.md#known-limitations).
 
 ## Quickstart
 
