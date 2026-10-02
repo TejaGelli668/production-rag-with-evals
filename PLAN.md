@@ -255,7 +255,7 @@ Notes from Phase 2 so far:
 ### Phase 3: Experiments (~2–3 days) 🚧 finishing
 - [x] `full` corpus indexed (360 filings, 81,517 chunks); `e1_full` is the Phase 3 baseline
 - [x] E2 chunking: 250-token chunks hurt (doc hit −0.20\*); page-bounded chunks change nothing, alone or stacked. **Keep 500-token windows**
-- [x] E3 markdown tables (pymupdf4llm): no retrieval gain; judged on `focused` 16% vs 14% (n.s.). **E3b** (gold pages from each parser) is running to isolate the generator effect
+- [x] E3 markdown tables (pymupdf4llm): no retrieval gain; judged on `focused` 16% vs 14% (n.s.). E3b, with gold pages from each parser: 54% vs 52% (n.s.). **Keep PyMuPDF**
 - [x] E4 BM25 hybrid: hurts alone (doc hit −0.18\*), adds nothing with filters. **Dropped**
 - [x] E5 company + fiscal-year filters: page hit@5 0.20 → 0.38\*. **Kept**
 - [x] E6 cross-encoder rerank of top-50: with filters, page hit@5 → 0.54\*. **Kept**

@@ -1,0 +1,145 @@
+{
+  "run": "e3b_oracle_md__dev",
+  "config": "e3b_oracle_md",
+  "split": "dev",
+  "generator": "qwen3:14b",
+  "retriever": "oracle",
+  "judge": [
+    "qwen3:14b"
+  ],
+  "judge_is_generator": true,
+  "cases": 50,
+  "rows": 50,
+  "truncated": 0,
+  "unresolved_errors": 0,
+  "metrics": {
+    "correct": {
+      "mean": 0.54,
+      "ci95": [
+        0.4,
+        0.68
+      ],
+      "n": 50
+    },
+    "refused": {
+      "mean": 0.12,
+      "ci95": [
+        0.04,
+        0.22
+      ],
+      "n": 50
+    },
+    "faithfulness": {
+      "mean": 0.9595959595959596,
+      "ci95": [
+        0.9015151515151515,
+        1.0
+      ],
+      "n": 44
+    },
+    "fully_faithful": {
+      "mean": 0.9318181818181818,
+      "ci95": [
+        0.8409090909090909,
+        1.0
+      ],
+      "n": 44
+    },
+    "numeric_match": {
+      "mean": 0.6666666666666666,
+      "ci95": [
+        0.4666666666666667,
+        0.8666666666666667
+      ],
+      "n": 15
+    },
+    "cites_gold_page": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 44
+    },
+    "has_citation": {
+      "mean": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n": 44
+    },
+    "invalid_citations": {
+      "mean": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n": 44
+    }
+  },
+  "by_tag": {
+    "domain-relevant": {
+      "correct": {
+        "mean": 0.375,
+        "ci95": [
+          0.1875,
+          0.625
+        ],
+        "n": 16
+      },
+      "refused": {
+        "mean": 0.1875,
+        "ci95": [
+          0.0,
+          0.375
+        ],
+        "n": 16
+      }
+    },
+    "metrics-generated": {
+      "correct": {
+        "mean": 0.5294117647058824,
+        "ci95": [
+          0.29411764705882354,
+          0.7647058823529411
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.11764705882352941,
+        "ci95": [
+          0.0,
+          0.29411764705882354
+        ],
+        "n": 17
+      }
+    },
+    "novel-generated": {
+      "correct": {
+        "mean": 0.7058823529411765,
+        "ci95": [
+          0.47058823529411764,
+          0.8823529411764706
+        ],
+        "n": 17
+      },
+      "refused": {
+        "mean": 0.058823529411764705,
+        "ci95": [
+          0.0,
+          0.17647058823529413
+        ],
+        "n": 17
+      }
+    }
+  },
+  "perf": {
+    "generation_latency_p50_s": 5.2615,
+    "generation_latency_p95_s": 11.296,
+    "input_tokens_mean": 1393.46,
+    "output_tokens_mean": 89.04,
+    "judge_input_tokens_mean": 1702.88,
+    "retrieval_latency_p50_s": 0.0
+  }
+}

@@ -9,6 +9,24 @@ bootstrap 95% CIs; **\*** marks intervals that exclude zero. With n = 50, pass-r
 roughly ±14 points, so only large effects are distinguishable. The held-out `test` split is
 reserved for the final configuration.
 
+## Summary
+
+**Final configuration: [`stack_filter_rerank`](../configs/stack_filter_rerank.yaml)**: 500-token
+chunks of PyMuPDF text, bge-small embeddings, company + fiscal-year filters inferred from the
+question, top-50 reranked to 5 with bge-reranker-v2-m3.
+
+| # | Change | Main evidence (dev, n = 50) | Decision |
+|---|---|---|---|
+| E2 | Page-bounded / 250-token chunks | 250-token: doc hit −0.20\*; page-bounded: no change, even stacked | Keep 500-token windows |
+| E3 | Markdown tables (pymupdf4llm) | No retrieval gain; with gold pages in context, 54% vs 52% for PyMuPDF (n.s.) | Keep PyMuPDF |
+| E4 | BM25 hybrid (RRF) | Doc hit −0.18\* alone; no gain with filters | Dropped |
+| **E5** | **Company + fiscal-year filters** | **Page hit@5 0.20 → 0.38\*** | **Kept** |
+| **E6** | **Cross-encoder rerank of top-50** | **With filters: page hit@5 → 0.54\*** | **Kept** |
+| E7 | LLM query rewriting | Page hit@5 +0.06 (CI touches 0); none on multi-page questions | Not adopted |
+| E8 | Stepwise answer format | Refusals −0.14\*, accuracy ±0: refusals became wrong answers | Not adopted |
+| E9 | Embedding swap (bge-m3) | — | Deferred (~2 h re-index) |
+| **All** | **`e1_full` → `stack_filter_rerank`** | **Correct 12% → 40%, Δ +0.28 [+0.16, +0.40]\*** | |
+
 ## E0: bounds (focused corpus, judged)
 
 | Config | Correct | Refused | What it shows |
@@ -33,7 +51,7 @@ distractors: other years and other filing types from the same company.
 | `focused` (84 filings) | 0.92 | 0.24 | 0.56 |
 | `full` (360 filings) | **0.66** | 0.20 | 0.55 |
 
-## E2–E6: retrieval (full corpus, retrieval-only)
+## E4–E6: retrieval components (full corpus, retrieval-only)
 
 Retrieval-only runs need no LLM calls, so each config is screened in about a minute (reranked
 ones in a few minutes).
@@ -95,7 +113,20 @@ right page, so the parser rarely gets a chance to matter.
 **E3b isolates the parser** by giving the generator the gold pages, as the oracle does, but
 with page text from our own parsers instead of FinanceBench's extraction:
 `e3b_oracle_pymupdf` vs `e3b_oracle_md`. The pages and questions are identical; only the
-table format differs. _Results pending._
+table format differs.
+
+| Gold pages, text from | Correct | Refused | Fully faithful |
+|---|---|---|---|
+| `e3b_oracle_pymupdf` (PyMuPDF) | 52% | 10% | 93% |
+| `e3b_oracle_md` (pymupdf4llm markdown) | 54% (Δ +0.02 [−0.06, +0.10]) | 12% | 93% |
+| `e0_oracle` (FinanceBench's extraction) | 54% | 14% | 95% |
+
+- **The parser doesn't matter once the right page is in context.** `qwen3:14b` reads
+  PyMuPDF's one-value-per-line tables about as well as markdown rows. All three extractions
+  land within 2 points.
+- **Decision: keep PyMuPDF.** Markdown parsing costs about 3 CPU-hours for the corpus and
+  buys nothing measurable here. The ceiling is set by the generator (about 54% even with
+  perfect pages), not by how the tables are serialized.
 
 ## E2: chunking (full corpus)
 
