@@ -1,0 +1,21 @@
+# CI eval gate thresholds for `configs/ci_gate.yaml` on the ci_smoke split (retrieval only).
+#
+# Calibrated 2026-10-02 on the CI corpus (51 filings: ci_smoke's 18 + same-company
+# neighbouring-year distractors). Measured, then set so the healthy config clears each
+# threshold by at least two questions, and known regressions fail:
+#
+#   metric                 healthy   filters off   250-token chunks
+#   doc_hit@5              1.00      0.90 ✗        0.95
+#   page_hit@5             0.35      0.20 ✗        0.35
+#   page_hit@10            0.65      0.30 ✗        0.65
+#   evidence_coverage@10   0.79      0.70 ✗        0.65 ✗
+#
+# Raise a threshold when a change measurably improves the metric; never lower one to
+# make a failing build pass without understanding why it failed.
+config: configs/ci_gate.yaml
+split: ci_smoke
+min:
+  doc_hit@5: 0.95
+  page_hit@5: 0.25
+  page_hit@10: 0.55
+  evidence_coverage@10: 0.72

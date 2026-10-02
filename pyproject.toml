@@ -15,6 +15,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "qdrant-client>=1.19.1",
     "sentence-transformers>=6.1.0",
+    "torch>=2.4",
     "tqdm>=4.66",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -55,3 +56,13 @@ rag = "rag.cli:main"
 [tool.uv]
 # The API, UI and tracing groups are part of the app, so a plain `uv sync` installs them all.
 default-groups = ["dev", "ui", "tracing"]
+
+# On Linux (CI, servers) use CPU-only PyTorch: the default wheels bundle CUDA (several GB).
+# macOS gets the regular PyPI build, which includes the MPS (Apple GPU) backend.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

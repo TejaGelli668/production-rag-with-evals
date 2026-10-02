@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (CPU-only torch on Linux, no UI/tracing extras)
+        run: uv sync --locked --no-group ui --no-group tracing
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Unit tests
+        run: uv run pytest
+
+  eval-gate:
+    name: Eval gate (retrieval, no LLM)
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --no-default-groups
+      - name: Cache embedding model
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('configs/ci_gate.yaml') }}
+      - name: Cache CI corpus PDFs
+        uses: actions/cache@v6
+        with:
+          path: data/financebench
+          key: financebench-ci-${{ hashFiles('src/rag/data/financebench.py', 'evals/splits/ci_smoke.json') }}
+      - name: Download CI corpus (51 filings, checksum-verified)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/download_financebench.py --mode ci
+      - name: Index
+        run: uv run rag ingest --config configs/ci_gate.yaml
+      - name: Retrieval eval on ci_smoke
+        run: uv run rag eval --config configs/ci_gate.yaml --split ci_smoke --retrieval-only
+      - name: Gate
+        run: uv run rag gate ci_gate__ci_smoke__retrieval

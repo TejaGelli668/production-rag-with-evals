@@ -1,0 +1,8 @@
+# CI eval gate: retrieval only (no LLM), on the 18 filings the ci_smoke questions reference.
+# Exercises query analysis, filters, chunking, embeddings and the vector store on every push.
+# The cross-encoder reranker (2.2 GB, slow on CPU) is not run in CI; see docs/evaluation.md.
+name: ci_gate
+corpus: ci
+parser: pymupdf
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, filters: company_year}

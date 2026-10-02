@@ -196,6 +196,24 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gate(args: argparse.Namespace) -> int:
+    import os
+
+    from rag.evals.gate import evaluate, load_gate, render
+
+    gate = load_gate(args.thresholds)
+    summary = json.loads((_run_dir(args.run) / "summary.json").read_text())
+    if summary["split"] != gate["split"]:
+        raise SystemExit(f"error: run is on {summary['split']!r}, gate expects {gate['split']!r}")
+    checks = evaluate(summary, gate["min"])
+    report = render(checks, summary["run"])
+    print(report)
+    if step_summary := os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(step_summary, "a") as f:
+            f.write(report + "\n")
+    return 0 if all(c.passed for c in checks) else 1
+
+
 def _add_judge_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--judge-provider", choices=["ollama", "anthropic"])
     p.add_argument("--judge-model", help="e.g. claude-haiku-4-5 (default: local qwen3:14b)")
@@ -260,6 +278,11 @@ def main(argv: list[str] | None = None) -> int:
     p_an.add_argument("run", type=Path, help="run dir or name under evals/runs/")
     p_an.add_argument("--examples", action="store_true", help="show example cases per stage")
     p_an.set_defaults(func=cmd_analyze)
+
+    p_gate = sub.add_parser("gate", help="fail if a run is below the CI gate thresholds")
+    p_gate.add_argument("run", type=Path, help="run dir or name under evals/runs/")
+    p_gate.add_argument("--thresholds", type=Path, default=Path("evals/gate.yaml"))
+    p_gate.set_defaults(func=cmd_gate)
 
     p_cal = sub.add_parser("calibrate", help="judge vs human agreement on labeled answers")
     p_cal.add_argument("run", type=Path, help="run dir or name under evals/runs/")

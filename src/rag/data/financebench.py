@@ -28,6 +28,9 @@ PDF_DIR = DATA_DIR / "pdfs"
 class CorpusMode(StrEnum):
     FOCUSED = "focused"  # only documents referenced by the 150 questions
     FULL = "full"  # every document with metadata
+    # CI eval gate: the ci_smoke questions' filings plus the same companies' filings from the
+    # neighbouring fiscal years, the distractors the year filter exists for (~73 MB).
+    CI = "ci"
 
 
 class Evidence(BaseModel):
@@ -96,5 +99,19 @@ def select_documents(
 ) -> list[Document]:
     if mode is CorpusMode.FULL:
         return documents
+    if mode is CorpusMode.CI:
+        from rag.data.splits import load_split  # local import: splits imports this module
+
+        smoke = set(load_split("ci_smoke"))
+        by_name = {d.doc_name: d for d in documents}
+        gold = [by_name[q.doc_name] for q in questions if q.financebench_id in smoke]
+        neighbours = {
+            d.doc_name
+            for d in documents
+            for g in gold
+            if d.company == g.company and abs(d.doc_period - g.doc_period) == 1
+        }
+        keep = {g.doc_name for g in gold} | neighbours
+        return [d for d in documents if d.doc_name in keep]
     referenced = {q.doc_name for q in questions}
     return [d for d in documents if d.doc_name in referenced]
