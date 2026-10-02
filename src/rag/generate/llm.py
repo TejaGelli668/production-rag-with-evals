@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
+from collections.abc import Iterator
 from typing import Any, Protocol
 
 import anthropic
@@ -29,8 +31,14 @@ class LLM(Protocol):
         """Return the model's reply; with `json_schema`, the reply text is JSON matching it."""
         ...
 
+    def stream(self, system: str, user: str) -> Iterator[str | LLMResponse]:
+        """Yield text pieces as they are generated, then the complete LLMResponse."""
+        ...
+
 
 class AnthropicLLM:
+    """Claude via the Anthropic API. Unused by default (the project runs on local Ollama)."""
+
     def __init__(self, cfg: GeneratorConfig, settings: Settings):
         self.cfg = cfg
         key = settings.anthropic_api_key
@@ -74,6 +82,12 @@ class AnthropicLLM:
             latency_s=time.perf_counter() - started,
         )
 
+    def stream(self, system: str, user: str) -> Iterator[str | LLMResponse]:
+        """Not incremental: yields the whole reply at once (this provider is unused by default)."""
+        response = self.complete(system, user)
+        yield response.text
+        yield response
+
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
@@ -83,17 +97,16 @@ class OllamaLLM:
         self.cfg = cfg
         self.client = httpx.Client(base_url=settings.ollama_host, timeout=600)
 
-    def complete(
-        self, system: str, user: str, json_schema: JsonSchema | None = None
-    ) -> LLMResponse:
-        started = time.perf_counter()
+    def _body(
+        self, system: str, user: str, json_schema: JsonSchema | None, stream: bool
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": self.cfg.model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "stream": False,
+            "stream": stream,
             "think": False,  # qwen3 is a reasoning model; keep answers fast and clean
             "options": {
                 "temperature": 0,
@@ -103,14 +116,12 @@ class OllamaLLM:
         }
         if json_schema:
             body["format"] = json_schema
-        try:
-            resp = self.client.post("/api/chat", json=body)
-            resp.raise_for_status()
-        except httpx.ConnectError as e:
-            raise LLMError(f"cannot reach Ollama at {self.client.base_url}; is it running?") from e
-        data = resp.json()
+        return body
+
+    @staticmethod
+    def _response(data: dict[str, Any], text: str, started: float) -> LLMResponse:
         return LLMResponse(
-            text=_THINK_BLOCK.sub("", data["message"]["content"]).strip(),
+            text=_THINK_BLOCK.sub("", text).strip(),
             model=data["model"],
             input_tokens=data.get("prompt_eval_count", 0),
             output_tokens=data.get("eval_count", 0),
@@ -120,6 +131,41 @@ class OllamaLLM:
             else data.get("done_reason"),
             latency_s=time.perf_counter() - started,
         )
+
+    def complete(
+        self, system: str, user: str, json_schema: JsonSchema | None = None
+    ) -> LLMResponse:
+        started = time.perf_counter()
+        try:
+            resp = self.client.post("/api/chat", json=self._body(system, user, json_schema, False))
+            resp.raise_for_status()
+        except httpx.ConnectError as e:
+            raise LLMError(f"cannot reach Ollama at {self.client.base_url}; is it running?") from e
+        data = resp.json()
+        return self._response(data, data["message"]["content"], started)
+
+    def stream(self, system: str, user: str) -> Iterator[str | LLMResponse]:
+        """Yield text pieces as they are generated, then the complete LLMResponse."""
+        started = time.perf_counter()
+        parts: list[str] = []
+        try:
+            with self.client.stream(
+                "POST", "/api/chat", json=self._body(system, user, None, True)
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    if piece := data.get("message", {}).get("content", ""):
+                        parts.append(piece)
+                        yield piece
+                    if data.get("done"):
+                        yield self._response(data, "".join(parts), started)
+                        return
+        except httpx.ConnectError as e:
+            raise LLMError(f"cannot reach Ollama at {self.client.base_url}; is it running?") from e
+        raise LLMError("Ollama stream ended without a final message")
 
 
 def make_llm(cfg: GeneratorConfig, settings: Settings) -> LLM:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from typing import Any
 
 from rag.config import PipelineConfig, Settings
 from rag.generate.citations import resolve_citations
@@ -14,8 +16,12 @@ from rag.generate.prompts import (
     build_user_prompt,
 )
 from rag.retrieve import NoRetriever, OracleRetriever, Retriever, SearchRetriever
-from rag.schema import Answer
+from rag.schema import Answer, LLMResponse, RetrievedChunk
 from rag.store import Filters, QdrantStore, make_client
+from rag.tracing import document_attributes, llm_attributes, span
+
+# ("sources", list[RetrievedChunk]) | ("token", str) | ("answer", Answer)
+StreamEvent = tuple[str, Any]
 
 
 class IndexNotFoundError(RuntimeError):
@@ -92,13 +98,23 @@ class RAGPipeline:
         settings = settings or Settings()
         return cls(cfg, make_retriever(cfg, settings), make_llm(cfg.generator, settings))
 
-    def ask(self, question: str, filters: Filters | None = None) -> Answer:
-        started = time.perf_counter()
-        retrieved = self.retriever.retrieve(question, filters)
-        retrieval_latency = time.perf_counter() - started
+    def _retrieve(
+        self, question: str, filters: Filters | None
+    ) -> tuple[list[RetrievedChunk], float]:
+        with span("retrieve", "RETRIEVER", **{"input.value": question}) as s:
+            started = time.perf_counter()
+            retrieved = self.retriever.retrieve(question, filters)
+            s.set_attributes(document_attributes(retrieved, "retrieval.documents"))
+        return retrieved, time.perf_counter() - started
 
-        user_prompt = build_user_prompt(question, retrieved, closed_book=self.closed_book)
-        llm_response = self.llm.complete(self.system_prompt, user_prompt)
+    def _answer(
+        self,
+        question: str,
+        retrieved: list[RetrievedChunk],
+        retrieval_latency: float,
+        user_prompt: str,
+        llm_response: LLMResponse,
+    ) -> Answer:
         return Answer(
             question=question,
             text=llm_response.text,
@@ -109,3 +125,35 @@ class RAGPipeline:
             config_name=self.cfg.name,
             user_prompt=user_prompt,
         )
+
+    def ask(self, question: str, filters: Filters | None = None) -> Answer:
+        with span("rag.ask", "CHAIN", **{"input.value": question}) as root:
+            retrieved, retrieval_latency = self._retrieve(question, filters)
+            user_prompt = build_user_prompt(question, retrieved, closed_book=self.closed_book)
+            with span("generate", "LLM") as s:
+                llm_response = self.llm.complete(self.system_prompt, user_prompt)
+                s.set_attributes(llm_attributes(self.system_prompt, user_prompt, llm_response))
+            answer = self._answer(question, retrieved, retrieval_latency, user_prompt, llm_response)
+            root.set_attribute("output.value", answer.text)
+        return answer
+
+    def ask_stream(self, question: str, filters: Filters | None = None) -> Iterator[StreamEvent]:
+        """Like `ask`, but yields ("sources", chunks) first, then ("token", text) pieces as
+        the answer is generated, then ("answer", Answer) with citations resolved."""
+        with span("rag.ask", "CHAIN", **{"input.value": question, "rag.streaming": True}) as root:
+            retrieved, retrieval_latency = self._retrieve(question, filters)
+            yield "sources", retrieved
+            user_prompt = build_user_prompt(question, retrieved, closed_book=self.closed_book)
+            llm_response: LLMResponse | None = None
+            with span("generate", "LLM") as s:
+                for event in self.llm.stream(self.system_prompt, user_prompt):
+                    if isinstance(event, LLMResponse):
+                        llm_response = event
+                    else:
+                        yield "token", event
+                if llm_response is None:
+                    raise RuntimeError("LLM stream ended without a final response")
+                s.set_attributes(llm_attributes(self.system_prompt, user_prompt, llm_response))
+            answer = self._answer(question, retrieved, retrieval_latency, user_prompt, llm_response)
+            root.set_attribute("output.value", answer.text)
+            yield "answer", answer

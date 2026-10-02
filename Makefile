@@ -1,6 +1,6 @@
-.PHONY: setup data data-focused splits explore ingest ask eval eval-retrieval check-judge test lint format check
+.PHONY: setup data data-focused splits explore ingest ask eval eval-retrieval check-judge serve ui phoenix test lint format check
 
-setup:  ## Install dependencies and git hooks
+setup:  ## Install dependencies (all groups) and git hooks
 	uv sync
 	uv run pre-commit install
 
@@ -34,6 +34,17 @@ eval-retrieval:  ## Retrieval-only metrics at k=1..20 (no LLM calls)
 
 check-judge:  ## Known-good / known-bad sanity checks for the judges
 	uv run rag check-judge --split $(SPLIT)
+
+SERVE_CONFIG ?= configs/stack_filter_rerank.yaml
+
+serve:  ## Run the API (FastAPI) with the final config; set RAG_TRACING=1 to trace to Phoenix
+	RAG_CONFIG=$(SERVE_CONFIG) uv run uvicorn rag.api.app:app --host 127.0.0.1 --port 8000
+
+ui:  ## Run the Streamlit UI (needs `make serve`)
+	uv run streamlit run ui/app.py --server.port 8501
+
+phoenix:  ## Run the Phoenix trace viewer at http://localhost:6006
+	uvx --from arize-phoenix phoenix serve
 
 test:
 	uv run pytest

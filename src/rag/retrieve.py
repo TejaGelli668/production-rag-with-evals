@@ -86,7 +86,15 @@ class SearchRetriever:
             if len(candidates) >= k:
                 break
         if self.reranker:
-            return self.reranker.rerank(question, candidates, k)
+            from rag.tracing import document_attributes, span
+
+            with span(
+                "rerank", "RERANKER", **{"reranker.query": question, "reranker.top_k": k}
+            ) as s:
+                s.set_attributes(document_attributes(candidates, "reranker.input_documents"))
+                reranked = self.reranker.rerank(question, candidates, k)
+                s.set_attributes(document_attributes(reranked, "reranker.output_documents"))
+            return reranked
         return [
             RetrievedChunk(chunk=rc.chunk, score=rc.score, rank=r)
             for r, rc in enumerate(candidates[:k], start=1)

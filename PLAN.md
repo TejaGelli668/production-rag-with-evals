@@ -244,7 +244,7 @@ Notes from Phase 1 (first answers from the baseline, not measured yet):
 - [x] E1 baseline on `dev`: 14% correct, 67% refused, Doc Hit@5 92%, Page Hit@5 22% (see `evals/results/baseline__dev.json`)
 - [x] E0 bounds on `dev`: closed-book 22% correct, oracle 54%, baseline 14%. Retrieval costs ~41 points; the local generator caps out near 54%
 - [x] Retrieval sweep (k=1..20) for the baseline
-- [ ] Full judge sanity checks on `dev`: deferred (memory pressure); re-run with `rag check-judge`
+- [x] Full judge sanity checks on `dev`: correctness judge ≥ 98% on every check; faithfulness judge 84% both ways (treat as approximate) (see Phase 3)
 - **Done when:** one command produces a full metrics report for any config
 
 Notes from Phase 2 so far:
@@ -252,7 +252,7 @@ Notes from Phase 2 so far:
 - Spot check of all 16 judged baseline answers: the correctness verdicts looked right. The faithfulness judge missed an arithmetic error (`financebench_id_04254`: 1,263 + 636 reported as 2,100).
 - One baseline case hit a 600 s Ollama timeout. It was logged as an infra error, not a wrong answer, and a re-run retries it.
 
-### Phase 3: Experiments (~2–3 days) 🚧 finishing
+### Phase 3: Experiments (~2–3 days) ✅
 - [x] `full` corpus indexed (360 filings, 81,517 chunks); `e1_full` is the Phase 3 baseline
 - [x] E2 chunking: 250-token chunks hurt (doc hit −0.20\*); page-bounded chunks change nothing, alone or stacked. **Keep 500-token windows**
 - [x] E3 markdown tables (pymupdf4llm): no retrieval gain; judged on `focused` 16% vs 14% (n.s.). E3b, with gold pages from each parser: 54% vs 52% (n.s.). **Keep PyMuPDF**
@@ -265,24 +265,30 @@ Notes from Phase 2 so far:
 - [x] **Judged on `dev`: `e1_full` 12% → `stack_filter_rerank` 40% correct (Δ +0.28 [+0.16, +0.40]\*)**; oracle ceiling 54%
 - [x] Error analysis (`rag analyze`): wrong-filing errors 16 → 1; the remaining failures are mostly wrong page in the right filing (19/30)
 - [x] README charts (`scripts/make_charts.py`, light/dark SVG)
-- [ ] **Final config = `stack_filter_rerank`.** One-time run on `test` (100 questions), with `e1_full` as a paired baseline: queued
+- [x] **Final config = `stack_filter_rerank`.** Held-out `test` (n=100, run once): **15% → 49% correct, Δ +0.34 [+0.24, +0.44]\***; wrong-filing errors 53 → 4
+- [x] Unanswerable set: 30/30 correctly declined (the set still needs human review); the trade-off is a 26% refusal rate on answerable `test` questions
+- [x] Full judge sanity checks on `dev`: correctness judge ≥ 98% on every check; faithfulness judge 84% both ways (treat as approximate)
 - **Done when:** the results table shows a measured gain for each component that was kept
 
 Results and reasoning are in [`docs/experiments.md`](docs/experiments.md). Infra changes: one embedded Qdrant folder per collection (embedded Qdrant allows one process per folder); an on-disk parse cache with parallel pre-parsing (`scripts/preparse.py`).
 
-### Phase 4: Service, UI and observability (~1–2 days)
-- [ ] FastAPI: `/ask` (streaming), `/health`, `/feedback`
-- [ ] Streamlit: question box, answer, citation cards with page snippets, 👍/👎
-- [ ] Phoenix tracing on every step; cost and latency per request
-- [ ] `docker compose up` brings up the whole stack
-- **Done when:** a fresh clone, `make data && make ingest && docker compose up`, works end to end
+### Phase 4: Service, UI and observability 🚧 in progress
+**Decisions (2026-10-02):** fully local. The LLM is Ollama `qwen3:14b` with no cloud API keys. Docker Compose moves to the very end.
+- [x] FastAPI: `/ask`, `/ask/stream` (SSE: sources → tokens → answer), `/feedback`, `/health`, `/pages/{doc}/{page}.png`; request and feedback logs joined by `request_id`; one pipeline call at a time (pipeline isn't thread-safe); the streaming pipeline runs on one thread so trace context stays intact
+- [x] Streamlit: streaming answer, source cards (filing, page, rerank score, cited), rendered PDF page, 👍/👎 via `st.feedback`, example questions, intro on the empty state
+- [x] Phoenix tracing (opt-in `RAG_TRACING=1`): OpenInference spans `rag.ask → retrieve → rerank`, `generate`, with documents, scores, prompts and token counts; FastAPI auto-instrumented
+- [x] Verified end to end on the real index: 3M capex ($1,577M ✓), Netflix liabilities ($5,466.31M ✓, wrong in Phase 1), NVIDIA (declined ✓), Boeing tax rate (signs flipped ✗, a generation error visible in the trace)
+- [ ] Docker Compose (api, qdrant server, ui, phoenix): **deferred to the end**
+- **Done when:** a fresh clone, `make data && make ingest && make serve` + `make ui`, works end to end
 
-### Phase 5: CI, deployment and write-up (~1 day)
-- [ ] `ci.yml`: lint and unit tests
-- [ ] `eval-gate.yml`: `ci_smoke` eval with thresholds; posts a metrics summary on the PR
-- [ ] Live demo deployment (see open decisions)
-- [ ] README: pitch, architecture diagram, results table, experiment story, error analysis, limitations, how to run
-- **Done when:** the repo is public, the demo link works and the README tells the story with numbers
+### Phase 5: CI, demo and write-up (~1 day)
+- [ ] `ci.yml`: lint + unit tests on every push and PR
+- [ ] Eval gate, **retrieval-only** (no LLM in CI): `ci_smoke` retrieval metrics against committed thresholds, on a small cached index
+- [ ] Demo: local only; record a short screen capture or GIF of the UI for the README
+- [ ] Human judge calibration (`rag label` + `rag calibrate`), plus review of the drafted unanswerable set (both need a human)
+- [ ] README: architecture diagram, results, limitations, how to run; make the repo public
+- [ ] Last: Docker Compose
+- **Done when:** the repo is public and the README tells the story with numbers
 
 **Total:** about 8–11 focused days.
 

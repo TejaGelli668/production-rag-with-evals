@@ -1,0 +1,49 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "uvicorn",
+        "rag.api.app:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "RAG_CONFIG": "configs/stack_filter_rerank.yaml",
+        "RAG_TRACING": "1"
+      },
+      "port": 8000
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "streamlit",
+        "run",
+        "ui/app.py",
+        "--server.port",
+        "8501",
+        "--server.headless",
+        "true"
+      ],
+      "port": 8501
+    },
+    {
+      "name": "phoenix",
+      "runtimeExecutable": "uvx",
+      "runtimeArgs": [
+        "--from",
+        "arize-phoenix",
+        "phoenix",
+        "serve"
+      ],
+      "port": 6006
+    }
+  ]
+}
