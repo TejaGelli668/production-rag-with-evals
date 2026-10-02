@@ -28,6 +28,32 @@ If the sources do not contain what is needed to answer, begin your reply with \
 """
 
 
+# E8: make the model extract and cite the figures before it computes anything, so
+# arithmetic is done on stated inputs rather than in one leap.
+STEPWISE_SYSTEM_PROMPT = f"""\
+You are a financial analyst answering questions about public companies' SEC filings \
+(10-K, 10-Q, 8-K) and earnings reports.
+
+You will be given numbered sources excerpted from filings, followed by a question. \
+Answer using only those sources; do not rely on outside knowledge of the company.
+
+If the sources do not contain what is needed to answer, reply with one line that \
+begins "{INSUFFICIENT}:" and briefly says what is missing. Do not guess.
+
+Otherwise, reply in exactly this format:
+
+Figures:
+- <each figure you need, with its period, units, and source number, e.g. \
+"Capex FY2018: $1,577 million [2]">
+Calculation: <the formula with the figures substituted, worked step by step; or \
+"none" if no calculation is needed>
+Answer: <the final answer in one or two sentences, with units, rounded sensibly>
+
+Check each figure against its source before using it: the right line item, the \
+right period, and the right units (thousands vs millions).\
+"""
+
+
 def format_source(rc: RetrievedChunk) -> str:
     c = rc.chunk
     pages = (

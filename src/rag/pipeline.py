@@ -7,7 +7,12 @@ import time
 from rag.config import PipelineConfig, Settings
 from rag.generate.citations import resolve_citations
 from rag.generate.llm import LLM, make_llm
-from rag.generate.prompts import CLOSED_BOOK_SYSTEM_PROMPT, SYSTEM_PROMPT, build_user_prompt
+from rag.generate.prompts import (
+    CLOSED_BOOK_SYSTEM_PROMPT,
+    STEPWISE_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+)
 from rag.retrieve import NoRetriever, OracleRetriever, Retriever, SearchRetriever
 from rag.schema import Answer
 from rag.store import Filters, QdrantStore, make_client
@@ -47,7 +52,13 @@ def make_retriever(cfg: PipelineConfig, settings: Settings) -> Retriever:
         from rag.rerank import Reranker
 
         reranker = Reranker(rc.reranker_model)
-    return SearchRetriever(rc, Embedder(cfg.embedder), store, analyzer, bm25, reranker)
+    rewriter = None
+    if rc.rewrite:
+        from rag.generate.llm import make_llm
+        from rag.rewrite import QueryRewriter
+
+        rewriter = QueryRewriter(make_llm(cfg.generator, settings), rc.max_rewrites)
+    return SearchRetriever(rc, Embedder(cfg.embedder), store, analyzer, bm25, reranker, rewriter)
 
 
 class RAGPipeline:
@@ -56,7 +67,12 @@ class RAGPipeline:
         self.retriever = retriever
         self.llm = llm
         self.closed_book = cfg.retriever.type == "none"
-        self.system_prompt = CLOSED_BOOK_SYSTEM_PROMPT if self.closed_book else SYSTEM_PROMPT
+        if self.closed_book:
+            self.system_prompt = CLOSED_BOOK_SYSTEM_PROMPT
+        elif cfg.generator.prompt == "stepwise":
+            self.system_prompt = STEPWISE_SYSTEM_PROMPT
+        else:
+            self.system_prompt = SYSTEM_PROMPT
 
     @classmethod
     def from_config(cls, cfg: PipelineConfig, settings: Settings | None = None) -> RAGPipeline:

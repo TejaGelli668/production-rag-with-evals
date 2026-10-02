@@ -58,6 +58,9 @@ class RetrieverConfig(BaseModel):
     # Pool size gathered before fusion or reranking.
     candidates: int = 50
     rrf_k: int = 60
+    # LLM query rewriting (E7): extra search queries, pooled with the original.
+    rewrite: bool = False
+    max_rewrites: int = 3
     # Cross-encoder reranking of the candidate pool (E6).
     rerank: bool = False
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
@@ -72,6 +75,8 @@ class GeneratorConfig(BaseModel):
     effort: Literal["low", "medium", "high", "xhigh", "max"] | None = "medium"
     # Ollama only: context window; the default (2-4k) would truncate retrieved context.
     num_ctx: int = 16384
+    # default: answer first, then support. stepwise (E8): figures -> calculation -> answer.
+    prompt: Literal["default", "stepwise"] = "default"
 
 
 class JudgeConfig(GeneratorConfig):

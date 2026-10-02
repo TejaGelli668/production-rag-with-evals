@@ -1,0 +1,10 @@
+# E8: stepwise answer format (figures -> calculation -> answer) on top of stack_filter_rerank.
+name: e8_stepwise
+corpus: full
+parser: pymupdf
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, filters: company_year, candidates: 50, rerank: true}
+generator:
+  provider: ollama
+  model: qwen3:14b
+  prompt: stepwise

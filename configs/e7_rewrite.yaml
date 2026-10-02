@@ -1,0 +1,10 @@
+# E7: LLM query rewriting on top of stack_filter_rerank. Extra search queries (one per
+# line item to look up) are pooled with the original and reranked against the question.
+name: e7_rewrite
+corpus: full
+parser: pymupdf
+chunker: {type: fixed, size: 500, overlap: 50}
+retriever: {type: dense, top_k: 5, filters: company_year, candidates: 50, rerank: true, rewrite: true}
+generator:
+  provider: ollama
+  model: qwen3:14b

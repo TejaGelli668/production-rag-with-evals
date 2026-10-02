@@ -113,3 +113,70 @@ def test_explicit_filters_override_inferred_ones():
     cfg = RetrieverConfig(top_k=2, filters="company_year")
     SearchRetriever(cfg, FakeEmbedder(), store, ANALYZER).retrieve("3M FY2018", {"company": "X"})
     assert store.calls == [{"company": "X"}]
+
+
+class ScriptedLLM:
+    def __init__(self, text):
+        self.text, self.calls = text, 0
+
+    def complete(self, system, user, json_schema=None):
+        from rag.schema import LLMResponse
+
+        self.calls += 1
+        return LLMResponse(
+            text=self.text,
+            model="m",
+            input_tokens=1,
+            output_tokens=1,
+            stop_reason="stop",
+            latency_s=0.0,
+        )
+
+
+def test_rewriter_dedupes_caps_and_survives_bad_output():
+    from rag.rewrite import QueryRewriter
+
+    llm = ScriptedLLM(
+        '{"queries": ["3M capex 2018", "3m CAPEX 2018", "3M revenue 2018", "x", "y"]}'
+    )
+    assert QueryRewriter(llm, max_queries=2).rewrite("Q?") == ["3M capex 2018", "3M revenue 2018"]
+    assert QueryRewriter(ScriptedLLM("not json")).rewrite("Q?") == []
+
+
+class QueryStore:
+    """Each query 'finds' a different chunk; records the filters used."""
+
+    def __init__(self):
+        self.filters = []
+
+    def search(self, vector, top_k, filters=None):
+        self.filters.append(filters)
+        cid = str(int(vector[0]))
+        return [RetrievedChunk(chunk=chunk(cid, cid), score=1.0, rank=1)]
+
+
+class QueryEmbedder:
+    def embed_query(self, text):
+        return np.array([{"orig": 1, "sub a": 2, "sub b": 3}[text]])
+
+
+def test_rewrites_pool_results_under_the_original_questions_filters():
+    from rag.rewrite import QueryRewriter
+
+    rewriter = QueryRewriter(ScriptedLLM('{"queries": ["sub a", "sub b"]}'))
+    cfg = RetrieverConfig(top_k=3, candidates=5)
+    retriever = SearchRetriever(cfg, QueryEmbedder(), QueryStore(), rewriter=rewriter)
+    out = retriever.retrieve("orig", filters={"company": ["3M"]})
+    assert {r.chunk.chunk_id for r in out} == {"1", "2", "3"}
+    assert retriever.store.filters == [{"company": ["3M"]}] * 3
+    assert retriever.last_queries == ["orig", "sub a", "sub b"]
+
+
+def test_stepwise_prompt_is_selected_by_config():
+    from rag.config import GeneratorConfig, PipelineConfig
+    from rag.generate.prompts import STEPWISE_SYSTEM_PROMPT
+    from rag.pipeline import RAGPipeline
+    from rag.retrieve import NoRetriever
+
+    cfg = PipelineConfig(name="x", generator=GeneratorConfig(prompt="stepwise"))
+    assert RAGPipeline(cfg, NoRetriever(), ScriptedLLM("")).system_prompt == STEPWISE_SYSTEM_PROMPT

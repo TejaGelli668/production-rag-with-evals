@@ -181,6 +181,21 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_analyze(args: argparse.Namespace) -> int:
+    from rag.evals.analysis import analyze, render
+
+    report = analyze(_run_dir(args.run))
+    print(render(report))
+    if args.examples:
+        for stage, items in report["examples"].items():
+            print(f"\n{stage}:")
+            for ex in items:
+                print(f"  {ex['id']}: {ex['question']}")
+                print(f"    answer: {ex['answer']}")
+                print(f"    gold:   {ex['gold']}")
+    return 0
+
+
 def _add_judge_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--judge-provider", choices=["ollama", "anthropic"])
     p.add_argument("--judge-model", help="e.g. claude-haiku-4-5 (default: local qwen3:14b)")
@@ -240,6 +255,11 @@ def main(argv: list[str] | None = None) -> int:
     p_lab = sub.add_parser("label", help="hand-label a run's answers for judge calibration")
     p_lab.add_argument("run", type=Path, help="run dir or name under evals/runs/")
     p_lab.set_defaults(func=cmd_label)
+
+    p_an = sub.add_parser("analyze", help="attribute each failure to a pipeline stage")
+    p_an.add_argument("run", type=Path, help="run dir or name under evals/runs/")
+    p_an.add_argument("--examples", action="store_true", help="show example cases per stage")
+    p_an.set_defaults(func=cmd_analyze)
 
     p_cal = sub.add_parser("calibrate", help="judge vs human agreement on labeled answers")
     p_cal.add_argument("run", type=Path, help="run dir or name under evals/runs/")

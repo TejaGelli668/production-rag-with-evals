@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from rag.embed import Embedder
     from rag.query import QueryAnalyzer
     from rag.rerank import Reranker
+    from rag.rewrite import QueryRewriter
     from rag.sparse import BM25Index
 
 
@@ -35,6 +36,7 @@ class SearchRetriever:
         analyzer: QueryAnalyzer | None = None,
         bm25: BM25Index | None = None,
         reranker: Reranker | None = None,
+        rewriter: QueryRewriter | None = None,
     ):
         self.cfg = cfg
         self.embedder = embedder
@@ -42,6 +44,8 @@ class SearchRetriever:
         self.analyzer = analyzer
         self.bm25 = bm25
         self.reranker = reranker
+        self.rewriter = rewriter
+        self.last_queries: list[str] = []  # the queries behind the latest retrieval, for traces
 
     def _filter_attempts(self, question: str, filters: Filters | None) -> list[Filters]:
         if filters:  # explicit filters from the caller win
@@ -63,11 +67,21 @@ class SearchRetriever:
         self, question: str, filters: Filters | None = None, top_k: int | None = None
     ) -> list[RetrievedChunk]:
         k = top_k or self.cfg.top_k
-        pool = max(self.cfg.candidates, k) if (self.bm25 or self.reranker) else k
+        expands = self.bm25 or self.reranker or self.rewriter
+        pool = max(self.cfg.candidates, k) if expands else k
+        queries = [question] + (self.rewriter.rewrite(question) if self.rewriter else [])
+        self.last_queries = queries
         candidates: list[RetrievedChunk] = []
         # Strictest filters first; relax when they match fewer than k chunks.
+        # Filters always come from the original question.
         for attempt in self._filter_attempts(question, filters):
-            candidates = self._candidates(question, attempt, pool)
+            per_query = [self._candidates(q, attempt, pool) for q in queries]
+            if len(per_query) == 1:
+                candidates = per_query[0]
+            else:
+                from rag.sparse import rrf_fuse
+
+                candidates = rrf_fuse(per_query, k=self.cfg.rrf_k)[:pool]
             if len(candidates) >= k:
                 break
         if self.reranker:

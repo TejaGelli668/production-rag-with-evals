@@ -260,7 +260,9 @@ Notes from Phase 2 so far:
 - [x] E3 markdown tables (pymupdf4llm, `focused`): no retrieval gain; generator effect pending a judged run
 - [ ] E2 chunking (page-bounded, 250-token): indexes building
 - [ ] Judged end-to-end runs: `stack_filter_rerank`, `e1_full`, `e3_md_focused` (running)
-- [ ] E7 query rewriting, E8 prompting, E9 embedding swap
+- [x] E7 query rewriting (`src/rag/rewrite.py`) and E8 stepwise prompt implemented; runs queued after the judged runs
+- [ ] E9 embedding swap (bge-m3): deferred, since re-indexing 360 filings takes ~2 h locally
+- [x] `rag analyze <run>` attributes each failure to a pipeline stage (focused baseline: 34 of 42 failures are retrieval, mostly wrong page)
 - [ ] Error analysis on the best config; final run on `test`; charts for the README
 - **Done when:** the results table shows a measured gain for each component that was kept
 
